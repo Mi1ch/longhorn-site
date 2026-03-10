@@ -63,22 +63,27 @@ function MarketTicker() {
     { label: 'Inflation', value: '12.3%' },
     { label: 'BoZ Rate', value: '12.5%' },
   ];
+  const tickerItems = [...items, ...items, ...items]; /* triple for seamless loop */
   return (
     <div style={{
-      background: C.navy, padding: '10px 0', display: 'flex', alignItems: 'center',
-      gap: 0, overflow: 'hidden', borderTop: `2px solid ${C.red}`,
+      background: '#3B7DD8', padding: '10px 0', display: 'flex', alignItems: 'center',
+      overflow: 'hidden', position: 'relative',
     }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 24, padding: '0 32px', animation: 'none', whiteSpace: 'nowrap' }}>
-        {items.map((item, i) => (
+      <style>{`@keyframes tickerScroll { 0% { transform: translateX(0); } 100% { transform: translateX(-33.333%); } }`}</style>
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: 24, whiteSpace: 'nowrap',
+        animation: 'tickerScroll 20s linear infinite',
+      }}>
+        {tickerItems.map((item, i) => (
           <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             {item.isLabel ? (
               <span style={{ fontSize: 12, fontWeight: 700, color: C.white, background: C.red, padding: '4px 12px', borderRadius: 4 }}>{item.label}</span>
             ) : (
               <>
-                <span style={{ fontSize: 12, color: C.gray300, fontWeight: 500 }}>{item.label}</span>
-                <div style={{ width: 4, height: 12, borderRadius: 1, background: item.positive ? C.green : C.red, marginRight: 2 }} />
+                <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.75)', fontWeight: 500 }}>{item.label}</span>
+                <div style={{ width: 4, height: 12, borderRadius: 1, background: item.positive ? '#4ADE80' : 'rgba(255,255,255,0.5)', marginRight: 2 }} />
                 <span style={{ fontSize: 13, fontWeight: 700, color: item.positive ? '#4ADE80' : C.white }}>{item.value}</span>
-                {i < items.length - 1 && <div style={{ width: 1, height: 16, background: 'rgba(255,255,255,0.15)', marginLeft: 16 }} />}
+                {i < tickerItems.length - 1 && <div style={{ width: 1, height: 16, background: 'rgba(255,255,255,0.2)', marginLeft: 16 }} />}
               </>
             )}
           </div>
@@ -180,23 +185,6 @@ function HomePage({ onNavigate }) {
           backgroundPosition: 'center 35%',
           backgroundRepeat: 'no-repeat',
         }} />
-        {/* Lighter blue overlay for readability */}
-        <div style={{
-          position: 'absolute', inset: 0,
-          background: 'linear-gradient(135deg, rgba(15,61,110,0.82) 0%, rgba(37,99,168,0.68) 50%, rgba(59,125,216,0.55) 100%)',
-        }} />
-        {/* Bottom fade */}
-        <div style={{
-          position: 'absolute', bottom: 0, left: 0, right: 0, height: 80,
-          background: 'linear-gradient(0deg, rgba(15,61,110,0.4) 0%, transparent 100%)',
-          pointerEvents: 'none',
-        }} />
-        {/* Subtle red accent glow */}
-        <div style={{
-          position: 'absolute', top: '10%', right: '8%', width: 250, height: 250, borderRadius: '50%',
-          background: 'radial-gradient(circle, rgba(196,30,47,0.10) 0%, transparent 70%)',
-          pointerEvents: 'none',
-        }} />
 
         <div style={{ position: 'relative', zIndex: 1, padding: '0 60px', maxWidth: 640 }}>
           <div style={{
@@ -259,7 +247,7 @@ function HomePage({ onNavigate }) {
           >
             <div style={{
               width: 48, height: 48, borderRadius: 12,
-              background: C.navy, display: 'flex', alignItems: 'center', justifyContent: 'center',
+              background: C.red, display: 'flex', alignItems: 'center', justifyContent: 'center',
             }}>
               <Ic size={22} style={{ color: C.white }} />
             </div>
