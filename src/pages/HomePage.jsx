@@ -3,7 +3,8 @@ import { Link } from 'react-router-dom';
 import {
   TrendingUp, Shield, Users, Award, ArrowRight, ChevronDown,
   BarChart2, BookOpen, GraduationCap, Briefcase, Star, CheckCircle,
-  Play, Building, PieChart
+  Play, Building, PieChart, ChevronLeft, ChevronRight, DollarSign,
+  AlertTriangle, Search
 } from 'lucide-react';
 
 /* ── animated counter ── */
@@ -28,48 +29,64 @@ function Counter({ target, suffix = '', prefix = '' }) {
   return <span ref={ref}>{prefix}{count.toLocaleString()}{suffix}</span>;
 }
 
-/* ─────────────────────────────────────────────
-   LIGHTER BLUE COLOR PALETTE
-   (replacing all dark navy / #1a0000 / #2d0000)
-   ───────────────────────────────────────────── */
+/* ── Color palette ── */
 const blue = {
-  primary:    '#2563A8',  /* main lighter blue */
-  dark:       '#1A4B8C',  /* slightly deeper for contrast */
-  deeper:     '#0F3D6E',  /* deepest variant — still lighter than old navy */
-  light:      '#3B7DD8',  /* hover / lighter accent */
-  bg:         '#F0F5FB',  /* very light blue page background */
-  bg2:        '#E1ECF7',  /* card hover / subtle tint */
-  text:       '#0F2E50',  /* dark blue for headings */
+  primary: '#2563A8',
+  dark: '#1A4B8C',
+  deeper: '#0F3D6E',
+  light: '#3B7DD8',
+  bg: '#F0F5FB',
+  bg2: '#E1ECF7',
+  text: '#0F2E50',
 };
-const accent = '#C41E2F'; /* red from logo */
+const accent = '#C41E2F';
 
 /* ─────────────────────────────────────────────
-   ONLY 4 INVESTMENT FUNDS
+   HERO SLIDES — 6 services across 5 banners
+   Place Banner1.jpeg – Banner5.jpeg in public/images/
    ───────────────────────────────────────────── */
-const investments = [
+const heroSlides = [
   {
-    icon: TrendingUp,
-    label: 'Equity Fund',
-    desc: 'Invest in equities listed on the Lusaka Securities Exchange (LuSE) for long-term capital growth. Ideal for investors seeking higher returns who are comfortable with market fluctuations.',
-    color: accent,
-  },
-  {
+    image: '/images/Banner1.jpeg',
     icon: Shield,
-    label: 'Bond Fund',
-    desc: 'A lower-risk option investing in government securities and listed bonds from reputable institutions. Designed for investors seeking stable, predictable returns with capital preservation.',
-    color: blue.primary,
+    title: 'Pension Fund Management',
+    subtitle: 'Secure Your Retirement',
+    desc: 'We manage pension portfolios under strict PIA regulatory oversight — ensuring your retirement savings grow safely while delivering competitive, long-term returns for individuals and corporates.',
   },
   {
-    icon: PieChart,
-    label: 'Balanced Fund',
-    desc: 'A hybrid fund combining equities, bonds and money market instruments — delivering competitive risk-adjusted returns through diversification across multiple asset classes.',
-    color: blue.dark,
+    image: '/images/Banner2.jpeg',
+    icon: TrendingUp,
+    title: 'Unit Trust Fund Management',
+    subtitle: 'Invest From Just K100/Month',
+    desc: 'Our SEC-governed Unit Trust pools investor funds into 7 professionally managed portfolios — from equities to property — making diversified investing accessible to every Zambian.',
   },
   {
-    icon: Building,
-    label: 'Property Fund',
-    desc: 'Gain exposure to the property sector through in-country and global listed property investments. Perfect for investors looking to diversify into real estate without direct ownership.',
-    color: blue.deeper,
+    image: '/images/Banner3.jpeg',
+    icon: DollarSign,
+    title: 'Credit',
+    subtitle: 'Flexible Financing Solutions',
+    desc: 'Access tailored credit facilities designed to meet your personal and business funding needs, backed by our deep understanding of Zambia\'s financial landscape.',
+  },
+  {
+    image: '/images/Banner4.jpeg',
+    icon: BarChart2,
+    title: 'Securities & Stock Broking',
+    subtitle: 'Trade on the LuSE',
+    desc: 'Buy and sell equities listed on the Lusaka Securities Exchange with expert guidance from our licensed brokers. Access real-time market insights and execution.',
+  },
+  {
+    image: '/images/Banner5.jpeg',
+    icon: Briefcase,
+    title: 'Consultancy & Advisory',
+    subtitle: 'Expert Financial Guidance',
+    desc: 'Our licensed advisors provide personalised, objective investment guidance — from portfolio structuring and market analysis to comprehensive financial planning.',
+  },
+  {
+    image: '/images/Banner1.jpeg',
+    icon: AlertTriangle,
+    title: 'Risk Management',
+    subtitle: 'Protect Your Investments',
+    desc: 'We identify, assess and mitigate financial risks across your portfolio using robust frameworks — ensuring your wealth is protected against market volatility and uncertainty.',
   },
 ];
 
@@ -83,107 +100,187 @@ const stats = [
   { value: 500, suffix: '+', label: 'Clients Served' },
   { value: 15, suffix: '+', label: 'Years of Excellence' },
   { value: 98, suffix: '%', label: 'Client Retention' },
-  { value: 7, suffix: '', label: 'Unit Trust Funds' },
+  { value: 6, suffix: '', label: 'Core Services' },
 ];
 
 export default function HomePage() {
   const [heroLoaded, setHeroLoaded] = useState(false);
+  const [currentSlide, setCurrentSlide] = useState(0);
+  const timerRef = useRef(null);
 
   useEffect(() => {
     setTimeout(() => setHeroLoaded(true), 100);
     window.scrollTo(0, 0);
   }, []);
 
+  /* Auto-rotate every 6 seconds */
+  useEffect(() => {
+    timerRef.current = setInterval(() => {
+      setCurrentSlide(prev => (prev + 1) % heroSlides.length);
+    }, 6000);
+    return () => clearInterval(timerRef.current);
+  }, []);
+
+  const goToSlide = (idx) => {
+    setCurrentSlide(idx);
+    clearInterval(timerRef.current);
+    timerRef.current = setInterval(() => {
+      setCurrentSlide(prev => (prev + 1) % heroSlides.length);
+    }, 6000);
+  };
+
+  const prevSlide = () => goToSlide((currentSlide - 1 + heroSlides.length) % heroSlides.length);
+  const nextSlide = () => goToSlide((currentSlide + 1) % heroSlides.length);
+
+  const slide = heroSlides[currentSlide];
+  const SlideIcon = slide.icon;
+
   return (
     <div>
 
       {/* ══════════════════════════════════════════
-          HERO — Uploaded landscape image (Long_horn.jpg)
-          Reduced height: 380px instead of 100vh
+          HERO — Cycling banners, no overlay
           ══════════════════════════════════════════ */}
       <section style={{
-        height: 380, minHeight: 380, maxHeight: 380,
+        height: 340, minHeight: 340, maxHeight: 340,
         position: 'relative', overflow: 'hidden',
         display: 'flex', alignItems: 'center',
       }}>
-        {/* ── Background image: place Long_horn.jpg in /public/images/ ── */}
+        {/* Background images — stacked, crossfade */}
+        {heroSlides.map((s, i) => (
+          <div key={i} style={{
+            position: 'absolute', inset: 0,
+            backgroundImage: `url(${s.image})`,
+            backgroundSize: 'cover',
+            backgroundPosition: 'center 40%',
+            backgroundRepeat: 'no-repeat',
+            opacity: currentSlide === i ? 1 : 0,
+            transition: 'opacity 1s ease-in-out',
+          }} />
+        ))}
+
+        {/* Subtle dark gradient behind text only — keeps text readable without tinting the whole image */}
         <div style={{
           position: 'absolute', inset: 0,
-          backgroundImage: 'url(/images/Long_horn.jpg)',
-          backgroundSize: 'cover',
-          backgroundPosition: 'center 35%',
-          backgroundRepeat: 'no-repeat',
-        }} />
-
-        {/* ── Lighter blue gradient overlay for readability ── */}
-        <div style={{
-          position: 'absolute', inset: 0,
-          background: `linear-gradient(135deg, rgba(15,61,110,0.82) 0%, rgba(37,99,168,0.68) 50%, rgba(59,125,216,0.55) 100%)`,
-        }} />
-
-        {/* Bottom edge fade */}
-        <div style={{
-          position: 'absolute', bottom: 0, left: 0, right: 0, height: 80,
-          background: 'linear-gradient(0deg, rgba(15,61,110,0.45) 0%, transparent 100%)',
+          background: 'linear-gradient(90deg, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0.3) 50%, transparent 75%)',
           pointerEvents: 'none',
         }} />
 
-        {/* Subtle red accent glow */}
-        <div style={{
-          position: 'absolute', top: '10%', right: '8%', width: 250, height: 250, borderRadius: '50%',
-          background: 'radial-gradient(circle, rgba(196,30,47,0.10) 0%, transparent 70%)',
-          pointerEvents: 'none',
-        }} />
-
+        {/* Slide content */}
         <div className="container" style={{ position: 'relative', zIndex: 1 }}>
           <div style={{
-            maxWidth: 640,
+            maxWidth: 560,
             opacity: heroLoaded ? 1 : 0,
-            transform: heroLoaded ? 'translateY(0)' : 'translateY(20px)',
-            transition: 'all 0.8s ease',
+            transition: 'opacity 0.5s ease',
           }}>
-            {/* Badge */}
-            <div style={{
-              display: 'inline-flex', alignItems: 'center', gap: 8,
-              padding: '5px 14px', borderRadius: 4,
-              background: 'rgba(196,30,47,0.22)', border: '1px solid rgba(196,30,47,0.45)',
-              marginBottom: 20,
+            {/* Service tag */}
+            <div key={`tag-${currentSlide}`} style={{
+              display: 'inline-flex', alignItems: 'center', gap: 10,
+              padding: '6px 16px', borderRadius: 6,
+              background: 'rgba(196,30,47,0.7)', border: '1px solid rgba(196,30,47,0.8)',
+              marginBottom: 16,
+              animation: 'fadeUp 0.6s ease both',
             }}>
-              <div style={{ width: 6, height: 6, borderRadius: '50%', background: accent, animation: 'pulse 2s infinite' }} />
-              <span style={{ fontSize: 11, fontWeight: 700, color: '#ff8a94', letterSpacing: '0.1em', textTransform: 'uppercase' }}>SEC & PIA Licensed</span>
+              <SlideIcon size={14} style={{ color: '#fff' }} />
+              <span style={{ fontSize: 11, fontWeight: 700, color: '#fff', letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+                {slide.title}
+              </span>
             </div>
 
-            <h1 style={{
+            <h1 key={`h-${currentSlide}`} style={{
               fontFamily: 'var(--font-serif)', fontWeight: 700,
-              fontSize: 'clamp(2rem, 3.6vw, 2.8rem)', lineHeight: 1.12,
-              color: '#fff', marginBottom: 14,
-              textShadow: '0 2px 24px rgba(0,0,0,0.2)',
+              fontSize: 'clamp(1.8rem, 3.2vw, 2.5rem)', lineHeight: 1.15,
+              color: '#fff', marginBottom: 12,
+              textShadow: '0 2px 12px rgba(0,0,0,0.5)',
+              animation: 'fadeUp 0.6s ease 0.1s both',
             }}>
-              Investing for Long-Term<br />Financial Growth
+              {slide.subtitle}
             </h1>
 
-            <p style={{
-              fontSize: 15, color: 'rgba(255,255,255,0.8)', lineHeight: 1.7,
-              marginBottom: 28, maxWidth: 500,
+            <p key={`p-${currentSlide}`} style={{
+              fontSize: 14, color: 'rgba(255,255,255,0.92)', lineHeight: 1.7,
+              marginBottom: 22, maxWidth: 480,
+              textShadow: '0 1px 6px rgba(0,0,0,0.4)',
+              animation: 'fadeUp 0.6s ease 0.2s both',
             }}>
-              Licensed asset managers. Unit trust & pension investment products. Research-driven investment process.
+              {slide.desc}
             </p>
 
-            <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-              <Link to="/services" className="btn-primary" style={{ background: accent, padding: '12px 26px', fontSize: 14 }}>
-                Explore Products <ArrowRight size={15} />
+            <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', animation: 'fadeUp 0.6s ease 0.3s both' }}>
+              <Link to="/services" className="btn-primary" style={{ background: accent, padding: '11px 24px', fontSize: 13 }}>
+                Learn More <ArrowRight size={14} />
               </Link>
-              <Link to="/portal" className="btn-outline" style={{ borderColor: 'rgba(255,255,255,0.5)', color: '#fff', padding: '12px 26px', fontSize: 14 }}>
-                Start Investing
+              <Link to="/contact" className="btn-outline" style={{ borderColor: 'rgba(255,255,255,0.6)', color: '#fff', padding: '11px 24px', fontSize: 13, backdropFilter: 'blur(4px)', background: 'rgba(255,255,255,0.12)' }}>
+                Get in Touch
               </Link>
             </div>
           </div>
         </div>
+
+        {/* Arrows */}
+        <button onClick={prevSlide} style={{
+          position: 'absolute', left: 20, top: '50%', transform: 'translateY(-50%)',
+          width: 44, height: 44, borderRadius: '50%', background: 'rgba(0,0,0,0.3)',
+          backdropFilter: 'blur(8px)', border: '1px solid rgba(255,255,255,0.2)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          cursor: 'pointer', color: '#fff', zIndex: 10, transition: 'all 0.2s',
+        }}
+          onMouseEnter={e => e.currentTarget.style.background = 'rgba(0,0,0,0.5)'}
+          onMouseLeave={e => e.currentTarget.style.background = 'rgba(0,0,0,0.3)'}
+        ><ChevronLeft size={20} /></button>
+
+        <button onClick={nextSlide} style={{
+          position: 'absolute', right: 20, top: '50%', transform: 'translateY(-50%)',
+          width: 44, height: 44, borderRadius: '50%', background: 'rgba(0,0,0,0.3)',
+          backdropFilter: 'blur(8px)', border: '1px solid rgba(255,255,255,0.2)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          cursor: 'pointer', color: '#fff', zIndex: 10, transition: 'all 0.2s',
+        }}
+          onMouseEnter={e => e.currentTarget.style.background = 'rgba(0,0,0,0.5)'}
+          onMouseLeave={e => e.currentTarget.style.background = 'rgba(0,0,0,0.3)'}
+        ><ChevronRight size={20} /></button>
+
+        {/* Dots */}
+        <div style={{
+          position: 'absolute', bottom: 16, left: '50%', transform: 'translateX(-50%)',
+          display: 'flex', gap: 8, zIndex: 10,
+          padding: '6px 14px', background: 'rgba(0,0,0,0.35)', backdropFilter: 'blur(8px)',
+          borderRadius: 20,
+        }}>
+          {heroSlides.map((_, i) => (
+            <button key={i} onClick={() => goToSlide(i)} style={{
+              width: currentSlide === i ? 24 : 8, height: 8,
+              borderRadius: currentSlide === i ? 4 : 50,
+              border: 'none', cursor: 'pointer', padding: 0,
+              background: currentSlide === i ? accent : 'rgba(255,255,255,0.5)',
+              transition: 'all 0.3s ease',
+            }} />
+          ))}
+        </div>
+
+        {/* Progress bar */}
+        <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 3, background: 'rgba(255,255,255,0.15)', zIndex: 10 }}>
+          <div key={`prog-${currentSlide}`} style={{
+            height: '100%', background: accent, borderRadius: '0 2px 2px 0',
+            animation: 'progressBar 6s linear both',
+          }} />
+        </div>
+
+        <style>{`
+          @keyframes fadeUp {
+            from { opacity: 0; transform: translateY(16px); }
+            to { opacity: 1; transform: translateY(0); }
+          }
+          @keyframes progressBar {
+            from { width: 0%; }
+            to { width: 100%; }
+          }
+        `}</style>
       </section>
 
 
       {/* ══════════════════════════════════════════
-          STATS — Lighter blue background
+          STATS
           ══════════════════════════════════════════ */}
       <section style={{
         background: blue.primary,
@@ -209,62 +306,11 @@ export default function HomePage() {
             ))}
           </div>
         </div>
-        <style>{`@media(max-width:700px){.stats-grid{grid-template-columns:repeat(2,1fr)!important}}`}</style>
       </section>
 
 
       {/* ══════════════════════════════════════════
-          OUR INVESTMENT SOLUTIONS — Only 4 funds
-          ══════════════════════════════════════════ */}
-      <section className="section-pad" style={{ background: blue.bg }}>
-        <div className="container">
-          <div style={{ textAlign: 'center', marginBottom: 56 }}>
-            <div style={{ width: 40, height: 3, borderRadius: 2, background: accent, margin: '0 auto 16px' }} />
-            <span className="tag">Our Investment Solutions</span>
-            <h2 className="section-heading" style={{ marginBottom: 16, color: blue.text }}>
-              Choose the Fund That<br />Fits Your Goals
-            </h2>
-            <p className="section-sub" style={{ margin: '0 auto', maxWidth: 560 }}>
-              Four professionally managed funds tailored to different risk profiles and investment objectives, all governed by the Securities and Exchange Commission.
-            </p>
-          </div>
-
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 24 }}>
-            {investments.map(({ icon: Icon, label, desc, color }) => (
-              <div key={label} className="card" style={{
-                padding: 32, borderTop: `4px solid ${color}`,
-                transition: 'all 0.3s',
-              }}
-                onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-4px)'; e.currentTarget.style.boxShadow = '0 12px 32px rgba(0,0,0,0.1)'; }}
-                onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = ''; }}
-              >
-                <div style={{
-                  width: 56, height: 56, borderRadius: 16,
-                  background: `${color}12`, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  marginBottom: 20,
-                }}>
-                  <Icon size={26} style={{ color }} />
-                </div>
-                <h3 style={{ fontFamily: 'var(--font-serif)', fontSize: 20, fontWeight: 700, color: blue.text, marginBottom: 10 }}>{label}</h3>
-                <p style={{ fontSize: 15, color: 'var(--gray-600)', lineHeight: 1.7, marginBottom: 20 }}>{desc}</p>
-                <Link to="/services" style={{
-                  display: 'inline-flex', alignItems: 'center', gap: 6,
-                  fontSize: 14, fontWeight: 600, color: color, transition: 'gap 0.2s',
-                }}
-                  onMouseEnter={e => e.currentTarget.style.gap = '10px'}
-                  onMouseLeave={e => e.currentTarget.style.gap = '6px'}
-                >
-                  Learn More <ArrowRight size={14} />
-                </Link>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-
-      {/* ══════════════════════════════════════════
-          WHY US — Lighter blue palette
+          WHY US
           ══════════════════════════════════════════ */}
       <section className="section-pad" style={{
         background: `linear-gradient(135deg, ${blue.deeper} 0%, ${blue.dark} 100%)`,
@@ -307,7 +353,6 @@ export default function HomePage() {
               </Link>
             </div>
 
-            {/* Right side - stat cards */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
               {[
                 { icon: Award, label: '15+ Years', sub: 'Industry Experience', color: accent },
@@ -334,7 +379,6 @@ export default function HomePage() {
             </div>
           </div>
         </div>
-        <style>{`@media(max-width:900px){.why-grid{grid-template-columns:1fr!important}}`}</style>
       </section>
 
 
@@ -375,7 +419,7 @@ export default function HomePage() {
 
 
       {/* ══════════════════════════════════════════
-          CTA — Lighter blue
+          CTA
           ══════════════════════════════════════════ */}
       <section style={{
         padding: '100px 0', position: 'relative', overflow: 'hidden',

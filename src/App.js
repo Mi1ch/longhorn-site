@@ -5,7 +5,8 @@ import {
   ChevronDown, ChevronRight, ChevronLeft, Search, LogIn, Building, PieChart,
   GraduationCap, Briefcase, BookOpen, Globe, Target, Mail, Phone, Clock,
   Lock, FileText, CreditCard, UserCheck, Building2, X, DollarSign, Activity,
-  Info, Play, Calculator, Newspaper, Calendar, Heart, Eye, Star, ArrowUpRight
+  Info, Play, Calculator, Newspaper, Calendar, Heart, Eye, Star, ArrowUpRight,
+  AlertTriangle
 } from "lucide-react";
 
 /* ── Stethoscope icon ── */
@@ -140,20 +141,23 @@ function MiniChart({ data, width=480, height=200, color=C.red }) {
 }
 
 /* ═══════════════════════════════════════════ */
+/*  HERO SLIDES DATA                          */
+/* ═══════════════════════════════════════════ */
+const heroSlides = [
+  { image: '/images/Banner1.jpeg', icon: Shield, title: 'Pension Fund Management', subtitle: 'Secure Your Retirement', desc: 'We manage pension portfolios under strict PIA regulatory oversight — ensuring your retirement savings grow safely while delivering competitive, long-term returns for individuals and corporates.' },
+  { image: '/images/Banner2.jpeg', icon: TrendingUp, title: 'Unit Trust Fund Management', subtitle: 'Invest From Just K100/Month', desc: 'Our SEC-governed Unit Trust pools investor funds into 7 professionally managed portfolios — from equities to property — making diversified investing accessible to every Zambian.' },
+  { image: '/images/Banner3.jpeg', icon: DollarSign, title: 'Credit', subtitle: 'Flexible Financing Solutions', desc: 'Access tailored credit facilities designed to meet your personal and business funding needs, backed by our deep understanding of Zambia\'s financial landscape.' },
+  { image: '/images/Banner4.jpeg', icon: BarChart2, title: 'Securities & Stock Broking', subtitle: 'Trade on the LuSE', desc: 'Buy and sell equities listed on the Lusaka Securities Exchange with expert guidance from our licensed brokers. Access real-time market insights and execution.' },
+  { image: '/images/Banner5.jpeg', icon: Briefcase, title: 'Consultancy & Advisory', subtitle: 'Expert Financial Guidance', desc: 'Our licensed advisors provide personalised, objective investment guidance — from portfolio structuring and market analysis to comprehensive financial planning.' },
+  { image: '/images/Banner1.jpeg', icon: AlertTriangle, title: 'Risk Management', subtitle: 'Protect Your Investments', desc: 'We identify, assess and mitigate financial risks across your portfolio using robust frameworks — ensuring your wealth is protected against market volatility and uncertainty.' },
+];
+
+/* ═══════════════════════════════════════════ */
 /*  HOME PAGE                                 */
 /* ═══════════════════════════════════════════ */
 function HomePage({ onNavigate }) {
-  /* Only 4 funds for the home page */
-  const homeFunds = [
-    { id: 'equities', icon: TrendingUp, label: 'Equity Fund', color: C.red,
-      desc: 'Invest in equities listed on the Lusaka Securities Exchange (LuSE) for long-term capital growth. Ideal for investors seeking higher returns who are comfortable with market fluctuations.' },
-    { id: 'fixed-income', icon: Shield, label: 'Bond Fund', color: '#1565C0',
-      desc: 'A lower-risk option investing in government securities and listed bonds from reputable institutions. Designed for investors seeking stable, predictable returns with capital preservation.' },
-    { id: 'multi-asset', icon: PieChart, label: 'Balanced Fund', color: '#6A3FB5',
-      desc: 'A hybrid fund combining equities, bonds and money market instruments — delivering competitive risk-adjusted returns through diversification across multiple asset classes.' },
-    { id: 'property', icon: Building, label: 'Property Fund', color: '#2E7D32',
-      desc: 'Gain exposure to the property sector through in-country and global listed property investments. Perfect for investors looking to diversify into real estate without direct ownership.' },
-  ];
+  const [currentSlide, setCurrentSlide] = useState(0);
+  const timerRef = useRef(null);
 
   const quickLinks = [
     { icon: Info, label: 'About Longhorn', page: 'about' },
@@ -164,51 +168,99 @@ function HomePage({ onNavigate }) {
     { icon: Newspaper, label: 'Insights & News', page: 'insights' },
   ];
 
+  /* Auto-rotate every 6 seconds */
+  useEffect(() => {
+    timerRef.current = setInterval(() => {
+      setCurrentSlide(prev => (prev + 1) % heroSlides.length);
+    }, 6000);
+    return () => clearInterval(timerRef.current);
+  }, []);
+
+  const goToSlide = (idx) => {
+    setCurrentSlide(idx);
+    clearInterval(timerRef.current);
+    timerRef.current = setInterval(() => {
+      setCurrentSlide(prev => (prev + 1) % heroSlides.length);
+    }, 6000);
+  };
+  const prevSlide = () => goToSlide((currentSlide - 1 + heroSlides.length) % heroSlides.length);
+  const nextSlide = () => goToSlide((currentSlide + 1) % heroSlides.length);
+
+  const slide = heroSlides[currentSlide];
+  const SlideIcon = slide.icon;
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', minHeight: 'calc(100vh - 64px)' }}>
 
       {/* ── Market Updates Ticker — above hero ── */}
       <MarketTicker />
 
-      {/* ── Hero — Uploaded landscape image ── */}
+      {/* ══════════════════════════════════════════
+          HERO — Cycling banners with service info
+          Place Banner1.jpeg–Banner5.jpeg in public/images/
+          ══════════════════════════════════════════ */}
       <div style={{
         position: 'relative', overflow: 'hidden',
-        height: 280, minHeight: 280, maxHeight: 280,
+        height: 320, minHeight: 320, maxHeight: 320,
         display: 'flex', alignItems: 'center',
         marginTop: 6,
       }}>
-        {/* Background image */}
+        {/* Background images — stacked, crossfade */}
+        {heroSlides.map((s, i) => (
+          <div key={i} style={{
+            position: 'absolute', inset: 0,
+            backgroundImage: `url(${s.image})`,
+            backgroundSize: 'cover',
+            backgroundPosition: 'center 40%',
+            backgroundRepeat: 'no-repeat',
+            opacity: currentSlide === i ? 1 : 0,
+            transition: 'opacity 1s ease-in-out',
+          }} />
+        ))}
+
+        {/* Subtle left-side gradient for text readability — no full-image tint */}
         <div style={{
           position: 'absolute', inset: 0,
-          backgroundImage: 'url(/images/Long_horn.jpg)',
-          backgroundSize: 'cover',
-          backgroundPosition: 'center 35%',
-          backgroundRepeat: 'no-repeat',
+          background: 'linear-gradient(90deg, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0.25) 45%, transparent 70%)',
+          pointerEvents: 'none',
         }} />
 
+        {/* Slide content */}
         <div style={{ position: 'relative', zIndex: 1, padding: '0 60px', maxWidth: 640 }}>
-          <div style={{
-            display: 'inline-flex', alignItems: 'center', gap: 8,
-            padding: '5px 14px', borderRadius: 4,
-            background: 'rgba(196,30,47,0.22)', border: '1px solid rgba(196,30,47,0.45)',
+          {/* Service tag with icon */}
+          <div key={`tag-${currentSlide}`} style={{
+            display: 'inline-flex', alignItems: 'center', gap: 10,
+            padding: '6px 16px', borderRadius: 6,
+            background: 'rgba(196,30,47,0.75)', border: '1px solid rgba(196,30,47,0.85)',
             marginBottom: 18,
+            animation: 'heroFadeUp 0.6s ease both',
           }}>
-            <div style={{ width: 6, height: 6, borderRadius: '50%', background: C.red }} />
-            <span style={{ fontSize: 11, fontWeight: 700, color: '#ff8a94', letterSpacing: '0.1em', textTransform: 'uppercase' }}>SEC & PIA Licensed</span>
+            <SlideIcon size={14} style={{ color: '#fff' }} />
+            <span style={{ fontSize: 11, fontWeight: 700, color: '#fff', letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+              {slide.title}
+            </span>
           </div>
 
-          <h1 style={{
+          <h1 key={`h-${currentSlide}`} style={{
             fontFamily: font.serif, fontWeight: 800,
-            fontSize: 'clamp(2rem, 3.6vw, 2.8rem)', lineHeight: 1.12,
+            fontSize: 'clamp(2rem, 3.6vw, 2.8rem)', lineHeight: 1.15,
             color: C.white, marginBottom: 14,
-            textShadow: '0 2px 24px rgba(0,0,0,0.2)',
+            textShadow: '0 2px 16px rgba(0,0,0,0.6), 0 1px 4px rgba(0,0,0,0.4)',
+            animation: 'heroFadeUp 0.6s ease 0.1s both',
           }}>
-            Investing for Long-Term<br />Financial Growth
+            {slide.subtitle}
           </h1>
-          <p style={{ fontSize: 15, color: 'rgba(255,255,255,0.8)', lineHeight: 1.7, marginBottom: 24, maxWidth: 500 }}>
-            Licensed asset managers. Unit trust & pension investment products. Research-driven investment process.
+
+          <p key={`p-${currentSlide}`} style={{
+            fontSize: 14, color: 'rgba(255,255,255,0.92)', lineHeight: 1.7,
+            marginBottom: 24, maxWidth: 480,
+            textShadow: '0 1px 6px rgba(0,0,0,0.4)',
+            animation: 'heroFadeUp 0.6s ease 0.2s both',
+          }}>
+            {slide.desc}
           </p>
-          <div style={{ display: 'flex', gap: 10 }}>
+
+          <div key={`btn-${currentSlide}`} style={{ display: 'flex', gap: 10, animation: 'heroFadeUp 0.6s ease 0.3s both' }}>
             <button onClick={() => onNavigate('products')} style={{
               display: 'inline-flex', alignItems: 'center', gap: 8, padding: '12px 26px',
               background: C.red, color: C.white, fontWeight: 700, fontSize: 13,
@@ -217,18 +269,78 @@ function HomePage({ onNavigate }) {
             }}
               onMouseEnter={e => e.currentTarget.style.background = C.redHover}
               onMouseLeave={e => e.currentTarget.style.background = C.red}
-            >Explore Products</button>
-            <button onClick={() => onNavigate('portal')} style={{
+            >Learn More <ArrowRight size={15} /></button>
+            <button onClick={() => onNavigate('contact')} style={{
               display: 'inline-flex', alignItems: 'center', gap: 8, padding: '12px 26px',
-              background: C.white, color: C.navy, fontWeight: 700, fontSize: 13,
-              borderRadius: 6, border: 'none', cursor: 'pointer', fontFamily: font.sans,
-              transition: 'all 0.2s',
+              background: 'rgba(255,255,255,0.15)', color: C.white, fontWeight: 700, fontSize: 13,
+              borderRadius: 6, border: '1px solid rgba(255,255,255,0.35)', cursor: 'pointer',
+              fontFamily: font.sans, backdropFilter: 'blur(4px)', transition: 'all 0.2s',
             }}
-              onMouseEnter={e => e.currentTarget.style.background = C.gray100}
-              onMouseLeave={e => e.currentTarget.style.background = C.white}
-            >Start Investing</button>
+              onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.25)'}
+              onMouseLeave={e => e.currentTarget.style.background = 'rgba(0,0,0,0.35)'}
+            >Get in Touch</button>
           </div>
         </div>
+
+        {/* Arrow navigation */}
+        <button onClick={prevSlide} style={{
+          position: 'absolute', left: 20, top: '50%', transform: 'translateY(-50%)',
+          width: 42, height: 42, borderRadius: '50%', background: 'rgba(0,0,0,0.35)',
+          backdropFilter: 'blur(8px)', border: '1px solid rgba(255,255,255,0.25)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          cursor: 'pointer', color: '#fff', zIndex: 10, transition: 'all 0.2s',
+        }}
+          onMouseEnter={e => e.currentTarget.style.background = 'rgba(0,0,0,0.5)'}
+          onMouseLeave={e => e.currentTarget.style.background = 'rgba(0,0,0,0.35)'}
+        ><ChevronLeft size={20} /></button>
+
+        <button onClick={nextSlide} style={{
+          position: 'absolute', right: 20, top: '50%', transform: 'translateY(-50%)',
+          width: 42, height: 42, borderRadius: '50%', background: 'rgba(0,0,0,0.35)',
+          backdropFilter: 'blur(8px)', border: '1px solid rgba(255,255,255,0.25)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          cursor: 'pointer', color: '#fff', zIndex: 10, transition: 'all 0.2s',
+        }}
+          onMouseEnter={e => e.currentTarget.style.background = 'rgba(0,0,0,0.5)'}
+          onMouseLeave={e => e.currentTarget.style.background = 'rgba(0,0,0,0.35)'}
+        ><ChevronRight size={20} /></button>
+
+        {/* Dot indicators */}
+        <div style={{
+          position: 'absolute', bottom: 18, left: '50%', transform: 'translateX(-50%)',
+          display: 'flex', gap: 8, zIndex: 10,
+          padding: '6px 14px', background: 'rgba(0,0,0,0.25)', backdropFilter: 'blur(8px)',
+          borderRadius: 20,
+        }}>
+          {heroSlides.map((_, i) => (
+            <button key={i} onClick={() => goToSlide(i)} style={{
+              width: currentSlide === i ? 24 : 8, height: 8,
+              borderRadius: currentSlide === i ? 4 : 50,
+              border: 'none', cursor: 'pointer', padding: 0,
+              background: currentSlide === i ? C.red : 'rgba(255,255,255,0.4)',
+              transition: 'all 0.3s ease',
+            }} />
+          ))}
+        </div>
+
+        {/* Progress bar */}
+        <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 3, background: 'rgba(255,255,255,0.1)', zIndex: 10 }}>
+          <div key={`prog-${currentSlide}`} style={{
+            height: '100%', background: C.red, borderRadius: '0 2px 2px 0',
+            animation: 'heroProgress 6s linear both',
+          }} />
+        </div>
+
+        <style>{`
+          @keyframes heroFadeUp {
+            from { opacity: 0; transform: translateY(16px); }
+            to { opacity: 1; transform: translateY(0); }
+          }
+          @keyframes heroProgress {
+            from { width: 0%; }
+            to { width: 100%; }
+          }
+        `}</style>
       </div>
 
       {/* ── Quick Link Icons Row ── */}
@@ -254,66 +366,6 @@ function HomePage({ onNavigate }) {
             <span style={{ fontSize: 12, fontWeight: 600, color: C.gray700, textAlign: 'center' }}>{label}</span>
           </button>
         ))}
-      </div>
-
-      {/* ── Our Investment Solutions — Only 4 funds ── */}
-      <div style={{ padding: '40px 60px', background: C.offWhite, flex: 1 }}>
-        <div style={{ textAlign: 'center', marginBottom: 32 }}>
-          <h2 style={{ fontFamily: font.serif, fontSize: 24, fontWeight: 700, color: C.gray900, marginBottom: 10 }}>Our Investment Solutions</h2>
-          <p style={{ fontSize: 14, color: C.gray500, maxWidth: 520, margin: '0 auto' }}>
-            Four professionally managed funds tailored to different risk profiles and investment objectives.
-          </p>
-        </div>
-
-        {/* 4 fund selector buttons */}
-        <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap', marginBottom: 32 }}>
-          {homeFunds.map((f) => {
-            const FIcon = f.icon;
-            return (
-              <button key={f.id} onClick={() => onNavigate('fund', f.id)} style={{
-                display: 'flex', alignItems: 'center', gap: 10, padding: '12px 24px',
-                borderRadius: 8, border: `1.5px solid ${C.gray200}`, background: C.white,
-                cursor: 'pointer', fontFamily: font.sans, fontSize: 14, fontWeight: 600,
-                color: C.gray800, transition: 'all 0.2s', minWidth: 180,
-              }}
-                onMouseEnter={e => { e.currentTarget.style.borderColor = f.color; e.currentTarget.style.color = f.color; e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 4px 16px rgba(0,0,0,0.08)'; }}
-                onMouseLeave={e => { e.currentTarget.style.borderColor = C.gray200; e.currentTarget.style.color = C.gray800; e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = 'none'; }}
-              >
-                <FIcon size={18} style={{ color: f.color }} />
-                {f.label}
-              </button>
-            );
-          })}
-        </div>
-
-        {/* 4 fund detail cards */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 20, maxWidth: 900, margin: '0 auto' }}>
-          {homeFunds.map(f => {
-            const FIcon = f.icon;
-            return (
-              <div key={f.id} onClick={() => onNavigate('fund', f.id)} style={{
-                background: C.white, borderRadius: 14, padding: '28px 26px', cursor: 'pointer',
-                border: `1px solid ${C.gray100}`, boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
-                transition: 'all 0.25s', position: 'relative', overflow: 'hidden',
-                borderTop: `4px solid ${f.color}`,
-              }}
-                onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-4px)'; e.currentTarget.style.boxShadow = '0 12px 32px rgba(0,0,0,0.1)'; }}
-                onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = '0 1px 3px rgba(0,0,0,0.04)'; }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 14 }}>
-                  <div style={{ width: 44, height: 44, borderRadius: 12, background: `${f.color}12`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <FIcon size={22} style={{ color: f.color }} />
-                  </div>
-                  <h3 style={{ fontSize: 18, fontWeight: 700, color: C.gray900, fontFamily: font.serif }}>{f.label}</h3>
-                </div>
-                <p style={{ fontSize: 14, color: C.gray500, lineHeight: 1.7, marginBottom: 16 }}>{f.desc}</p>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 600, color: f.color }}>
-                  Learn More <ArrowRight size={14} />
-                </div>
-              </div>
-            );
-          })}
-        </div>
       </div>
 
     </div>
@@ -699,16 +751,112 @@ function InsightsPage({ onNavigate }) {
 }
 
 /* ═══════════════════════════════════════════ */
+/*  TEAM DATA                                  */
+/* ═══════════════════════════════════════════ */
+const boardOfDirectors = [
+  { name: 'Chanda HJ Chileshe', role: 'Chairman', photo: '/images/team/ChandaChileshe.jpg', initials: 'CC', bio: 'Chanda is a seasoned lawyer and Managing Partner of Lloyd Jones & Collins with over 35 years experience in commercial and legal practice both locally and internationally. He holds a Bachelor of Arts – Joint Hons. in Law & Economics from the University of Keele as well as a Master of Laws Degree, LLM: Taxation, Insurance, Company Law from the University of London. He is a member of various professional bodies and has sat on various Boards including Finance Bank (Atlas Mara), Colgate Palmolive and the Revenue Appeals Tribunal, among others.' },
+  { name: 'Banji Gideon Moono', role: 'Director, CFA', photo: '/images/team/BanjiMoono.jpeg', initials: 'BM', bio: 'Banji is a qualified and experienced Finance, Accounting, and Investment professional with extensive experience in Banking and Investments. He has served in senior management positions with various commercial banks including Finance Bank and most recently, the United Bank for Africa where he is currently serving as the Group Head-Investor Relations based in Nigeria. Banji is a qualified Chartered Management Accountant (CIMA) and holder of the prestigious CFA Charter. He holds a Diploma in Treasury Management and is also a fellow of the Zambia Institute of Chartered Accountants (ZICA).' },
+  { name: 'Dionysius Makunka', role: 'CEO, CFA', photo: '/images/team/DionysusMakunka.jpg', initials: 'DM', bio: 'Dionysius is a qualified and experienced Economics and Finance professional with over twenty (20) years of practice with various institutions. He spent about twenty years at the Bank of Zambia where he served in senior management positions prior to going into private practice. He has also been involved in lecturing at the University of Zambia (Derivatives), ZIBFS (Investment Analysis & Portfolio Management) and the University of Lusaka (Risk Management). Dionysius is a Chartered Accountant (ACCA) and holds the prestigious CFA Charter. He also holds the Bachelor of Accountancy degree from the Copperbelt University as well as a Master of Science in Finance & Economics from Manchester University, UK.' },
+  { name: 'Namucana Musiwa', role: 'Director', photo: '/images/team/NamucanaMusiwa.jpg', initials: 'NM', bio: 'Namucana is an entrepreneur with extensive experience in governance and talent acquisition. She is the founder and CEO of Career Prospects Limited, one of the leading recruitment agencies in Zambia. She has served and continues to serve on various Boards including the Zambia Qualification Authority, Zambia Institute of Human Resources Management, Professional Insurance Corporation and the University of Zambia Council, Bank of Zambia REMCO, Zambia National Building Society REMCO, among others. Namucana holds a Bachelor of Arts in Public Administration and Economics obtained from the University of Zambia.' },
+  { name: 'Andrew John Kangwa', role: 'Investment Committee Member', photo: null, initials: 'AK', bio: 'Andrew is an experienced finance professional and entrepreneur. Having spent several years working in the Finance division of mining group, First Quantum Mining Plc, he set up private enterprises focused on diversified sectors. Among other qualifications, he holds a Master of Business Administration (MBA).' },
+  { name: 'Pathias Paupila', role: 'Director', photo: null, initials: 'PP', bio: 'Pathias is a qualified and experienced Legal, Credit, Risk and Compliance professional with extensive exposure to managing complex risk processes gained in several institutions for over 18 years. He possesses extensive experience in the allocation of capital to Small and Medium Enterprises (SMEs). Pathias also Chairs the Risk and Compliance Committee of Longhorn Associates Limited. He holds a Master of Science degree in Risk Management, a Bachelor of Laws degree and a Bachelor of Business Administration degree.' },
+];
+
+const managementTeam = [
+  { name: 'Dionysius Makunka', role: 'CEO, CFA', photo: '/images/team/DionysusMakunka.jpg', initials: 'DM', bio: 'Dionysius is a qualified and experienced Economics and Finance professional with over twenty (20) years of practice with various institutions. He spent about twenty years at the Bank of Zambia where he served in senior management positions prior to going into private practice. Dionysius is a Chartered Accountant (ACCA) and holds the prestigious CFA Charter.' },
+  { name: 'Brian Chilufya Chintu', role: 'Chief Investments & Operations Officer', photo: '/images/team/BrianChilufyaChintu.JPG', initials: 'BC', bio: 'Brian is a qualified and experienced Finance and Investments professional with experience in management of assorted investment portfolios including Pension Funds and Collective Investments. He has specialized in Investments during his time with the Madison Group where he served in various portfolios in Finance and Investments. More recently he served as Commercial Services Director at Zambia Airports Corporation. He comes with a wealth of experience with particular focus in Corporate Finance, Investments and Accounting.' },
+  { name: 'Marlon Nsofu', role: 'Chief Systems & Data Analytics Officer', photo: '/images/team/MarlonNsofu.jpg', initials: 'MN', bio: 'Marlon is an investment professional with over fourteen years of experience in managing pension funds and collective investment schemes. His expertise spans across money markets, capital markets, and other key economic sectors. He has earned certifications in computer science and data science, which he leverages to enhance his work in quantitative finance and financial engineering. He holds a bachelor\'s degree in finance from the Robert H. Smith School of Business at the University of Maryland, USA.' },
+  { name: 'Izukanji Nachiza Mwanza', role: 'CFO', photo: '/images/team/IzukanjiMwanza.jpg', initials: 'IM', bio: 'Izukanji started her accounting career with AMO Chartered Accountants in 2011 where she worked as a Management Trainee. She later worked at various institutions in the Finance and Accounting role. Prior to her accounting career, she pursued a diploma in Chemical Engineering at the Copperbelt University. Izukanji is a Chartered Accountant and holder of the ACCA qualification. She is also a member of both ACCA and ZICA.' },
+  { name: 'Lewis Mwale', role: 'Chief Partnerships Officer', photo: '/images/team/lewis.jpg', initials: 'LM', bio: 'Lewis is a qualified Social Security Expert and Financial Advisor with over 7 years work experience in the Pensions Industry in Zambia. He holds a Bachelor\'s Degree in Business Administration from the Copperbelt University and is currently pursuing a Master of Business Administration (MBA) - Finance. Prior to joining Longhorn, Lewis worked as a Financial Controller for Innscor Zambia Limited and as a Credit and Debt Analyst for Vision Fund Zambia.' },
+  { name: 'Patrick Edward Zulu', role: 'Chief Credit Operations & Fintech Officer', photo: null, initials: 'PZ', bio: 'Patrick is a seasoned Certified Credit Professional and management specialist with a proven record of building and leading diverse teams. He holds an MBA in Accounting and Finance from the University of Liverpool and a BA with a bias in Economics from the University of Zambia. With more than 18 years of experience, Patrick has worked across credit risk, strategic planning, human resource management and change management at leading institutions including Bayport Financial Services and Micro Finance Zambia Limited.' },
+];
+
+/* ── Team Member Card ── */
+function TeamCard({ member, accentColor, onSelect }) {
+  const [imgError, setImgError] = useState(false);
+  const hasPhoto = member.photo && !imgError;
+  return (
+    <div onClick={() => onSelect(member)} style={{
+      background: C.white, borderRadius: 16, overflow: 'hidden',
+      boxShadow: '0 2px 8px rgba(0,0,0,0.06)', cursor: 'pointer',
+      transition: 'all 0.3s', border: '1px solid rgba(0,0,0,0.06)',
+    }}
+      onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-4px)'; e.currentTarget.style.boxShadow = '0 12px 32px rgba(0,0,0,0.12)'; }}
+      onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.06)'; }}
+    >
+      <div style={{
+        height: 200, background: hasPhoto ? 'none' : `linear-gradient(135deg, ${accentColor}, ${accentColor}cc)`,
+        display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden',
+      }}>
+        {hasPhoto ? (
+          <img src={member.photo} alt={member.name} onError={() => setImgError(true)}
+            style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center top' }} />
+        ) : (
+          <span style={{ fontFamily: font.serif, fontWeight: 700, fontSize: 48, color: '#fff', opacity: 0.9 }}>{member.initials}</span>
+        )}
+      </div>
+      <div style={{ padding: '18px 20px' }}>
+        <h3 style={{ fontFamily: font.serif, fontSize: 16, fontWeight: 700, color: C.gray900, marginBottom: 4, lineHeight: 1.3 }}>{member.name}</h3>
+        <p style={{ fontSize: 12, color: accentColor, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 8 }}>{member.role}</p>
+        <p style={{ fontSize: 12, color: C.gray500, lineHeight: 1.5, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{member.bio}</p>
+        <div style={{ fontSize: 12, color: accentColor, fontWeight: 600, marginTop: 10 }}>View Profile →</div>
+      </div>
+    </div>
+  );
+}
+
+/* ── Team Member Modal ── */
+function TeamModal({ member, accentColor, onClose }) {
+  const [imgError, setImgError] = useState(false);
+  const hasPhoto = member.photo && !imgError;
+  return (
+    <div onClick={onClose} style={{
+      position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)',
+      zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24,
+    }}>
+      <div onClick={e => e.stopPropagation()} style={{
+        background: '#fff', borderRadius: 20, maxWidth: 640, width: '100%',
+        maxHeight: '85vh', overflow: 'auto', position: 'relative', boxShadow: '0 24px 64px rgba(0,0,0,0.2)',
+      }}>
+        <button onClick={onClose} style={{
+          position: 'absolute', top: 16, right: 16, width: 36, height: 36, borderRadius: '50%',
+          background: '#f3f4f6', border: 'none', cursor: 'pointer',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10,
+        }}><X size={18} style={{ color: '#374151' }} /></button>
+        <div style={{ display: 'flex' }}>
+          <div style={{
+            width: 220, minHeight: 280, flexShrink: 0,
+            background: hasPhoto ? 'none' : `linear-gradient(135deg, ${accentColor}, ${accentColor}cc)`,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            borderRadius: '20px 0 0 20px', overflow: 'hidden',
+          }}>
+            {hasPhoto ? (
+              <img src={member.photo} alt={member.name} onError={() => setImgError(true)}
+                style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center top' }} />
+            ) : (
+              <span style={{ fontFamily: font.serif, fontWeight: 700, fontSize: 56, color: '#fff', opacity: 0.9 }}>{member.initials}</span>
+            )}
+          </div>
+          <div style={{ flex: 1, padding: '32px 32px 32px 28px' }}>
+            <h2 style={{ fontFamily: font.serif, fontSize: 22, fontWeight: 700, color: C.gray900, marginBottom: 4 }}>{member.name}</h2>
+            <p style={{ fontSize: 13, color: accentColor, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 20 }}>{member.role}</p>
+            <div style={{ width: 32, height: 3, borderRadius: 2, background: accentColor, marginBottom: 16 }} />
+            <p style={{ fontSize: 14, color: C.gray600, lineHeight: 1.8 }}>{member.bio}</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════ */
 /*  ABOUT PAGE                                */
 /* ═══════════════════════════════════════════ */
 function AboutPage() {
   const [tab, setTab] = useState('about');
+  const [teamTab, setTeamTab] = useState('board');
+  const [selectedMember, setSelectedMember] = useState(null);
   const tabs = [{ k: 'about', l: 'About Us' }, { k: 'governance', l: 'Governance' }, { k: 'team', l: 'Our Team' }, { k: 'values', l: 'Core Values' }];
-  const team = [
-    { name: 'Loretta Ward', role: 'Founder & CEO', i: 'LW' }, { name: 'David Mwansa', role: 'Chief Investment Officer', i: 'DM' },
-    { name: 'Chileshe Banda', role: 'Head of Portfolio Mgmt', i: 'CB' }, { name: 'Natasha Phiri', role: 'Client Relations Director', i: 'NP' },
-    { name: 'Brian Zulu', role: 'Risk & Compliance Manager', i: 'BZ' }, { name: 'Grace Tembo', role: 'Sr. Investment Analyst', i: 'GT' },
-  ];
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', minHeight: 'calc(100vh - 64px)' }}>
@@ -729,6 +877,8 @@ function AboutPage() {
       </div>
 
       <div style={{ flex: 1, padding: '32px 60px', background: C.offWhite }}>
+
+        {/* About Us — unchanged */}
         {tab === 'about' && (
           <div style={{ display: 'grid', gridTemplateColumns: '1.3fr 1fr', gap: 32 }}>
             <div>
@@ -755,18 +905,54 @@ function AboutPage() {
           </div>
         )}
 
+        {/* Our Team — NEW: Board of Directors + Management */}
         {tab === 'team' && (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 20 }}>
-            {team.map(t => (
-              <div key={t.name} style={{ padding: 28, borderRadius: 14, background: C.white, boxShadow: '0 2px 8px rgba(0,0,0,0.06)', textAlign: 'center' }}>
-                <div style={{ width: 64, height: 64, borderRadius: '50%', background: `linear-gradient(135deg, ${C.navy}, ${C.navyLight})`, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 14px', fontFamily: font.serif, fontWeight: 700, fontSize: 20, color: C.white }}>{t.i}</div>
-                <div style={{ fontSize: 16, fontWeight: 700, color: C.gray900 }}>{t.name}</div>
-                <div style={{ fontSize: 13, color: C.red, fontWeight: 600, marginTop: 4 }}>{t.role}</div>
+          <div>
+            <div style={{ textAlign: 'center', marginBottom: 28 }}>
+              <div style={{ width: 40, height: 3, borderRadius: 2, background: C.red, margin: '0 auto 12px' }} />
+              <h2 style={{ fontFamily: font.serif, fontSize: 24, fontWeight: 700, color: C.gray900, marginBottom: 6 }}>Our People</h2>
+              <p style={{ fontSize: 14, color: C.gray500, maxWidth: 480, margin: '0 auto' }}>Meet the experienced professionals driving Longhorn Associates forward.</p>
+            </div>
+
+            {/* Board / Management toggle */}
+            <div style={{ display: 'flex', justifyContent: 'center', gap: 8, marginBottom: 32 }}>
+              {[{ key: 'board', label: 'Board of Directors' }, { key: 'mgmt', label: 'Management' }].map(t => (
+                <button key={t.key} onClick={() => setTeamTab(t.key)} style={{
+                  padding: '10px 28px', borderRadius: 100, fontSize: 14, fontWeight: 600, cursor: 'pointer',
+                  background: teamTab === t.key ? C.gray900 : C.white,
+                  color: teamTab === t.key ? '#fff' : C.gray500,
+                  border: teamTab === t.key ? `2px solid ${C.gray900}` : `2px solid ${C.gray200}`,
+                  transition: 'all 0.2s', fontFamily: font.sans,
+                }}>{t.label}</button>
+              ))}
+            </div>
+
+            {/* Board of Directors */}
+            {teamTab === 'board' && (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 22 }}>
+                {boardOfDirectors.map(m => (
+                  <TeamCard key={m.name} member={m} accentColor={C.red} onSelect={setSelectedMember} />
+                ))}
               </div>
-            ))}
+            )}
+
+            {/* Management */}
+            {teamTab === 'mgmt' && (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 22 }}>
+                {managementTeam.map(m => (
+                  <TeamCard key={m.name + m.role} member={m} accentColor={C.navyLight} onSelect={setSelectedMember} />
+                ))}
+              </div>
+            )}
+
+            {/* Bio Modal */}
+            {selectedMember && (
+              <TeamModal member={selectedMember} accentColor={teamTab === 'board' ? C.red : C.navyLight} onClose={() => setSelectedMember(null)} />
+            )}
           </div>
         )}
 
+        {/* Core Values — unchanged */}
         {tab === 'values' && (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
             {[{ I: Shield, l: 'Integrity', d: 'Complete transparency in all we do.' }, { I: TrendingUp, l: 'Performance', d: 'Delivering superior, consistent returns.' }, { I: Users, l: 'Community', d: 'Investing in Zambia\'s collective prosperity.' }, { I: Award, l: 'Excellence', d: 'Highest professional standards in everything.' }].map(({ I, l, d }) => (
@@ -779,6 +965,7 @@ function AboutPage() {
           </div>
         )}
 
+        {/* Governance — unchanged */}
         {tab === 'governance' && (
           <div style={{ maxWidth: 700 }}>
             <div style={{ width: 40, height: 3, background: C.red, borderRadius: 2, marginBottom: 16 }} />
