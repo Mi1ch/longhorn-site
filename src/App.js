@@ -1060,7 +1060,7 @@ function ContactPage() {
                 <div><label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: C.gray600, marginBottom: 5 }}>Service</label>
                   <select value={form.service} onChange={e => setForm({ ...form, service: e.target.value })} style={{ ...iS, background: C.white }}>
                     <option value="">Select...</option>
-                    {['Listed Equities Fund', 'Fixed Income Fund', 'Property Fund', 'Multi Assets Fund', 'Education Fund', 'White Coat Fund', 'Gratuity Fund', 'Portfolio Management', 'Pension Fund', 'Advisory', 'General'].map(s => <option key={s}>{s}</option>)}
+                    {['Pension Fund Management', 'Unit Trust Fund Management', 'Credit', 'Securities & Stock Broking', 'Consultancy & Advisory', 'Risk Management', 'General Enquiry'].map(s => <option key={s}>{s}</option>)}
                   </select>
                 </div>
               </div>
@@ -1202,6 +1202,171 @@ function ToolsPage({ onNavigate }) {
 }
 
 /* ═══════════════════════════════════════════ */
+/*  SERVICES / PRODUCTS PAGE                   */
+/* ═══════════════════════════════════════════ */
+const servicesList = [
+  { id: 'pension', icon: Shield, label: 'Pension Fund Management', color: C.red, image: '/images/Services/Pension.png',
+    tagline: 'PIA-regulated retirement security',
+    desc: 'Our pension fund management service ensures your retirement savings are professionally managed under strict PIA regulatory oversight. We design bespoke pension solutions for individuals, SMEs, and large corporates — delivering competitive, long-term returns while safeguarding your future.',
+    features: ['PIA-licensed and regulated', 'Corporate and individual schemes', 'Risk-graded investment options', 'Regular actuarial reviews', 'Comprehensive member reporting', 'Flexible contribution structures'] },
+  { id: 'unit-trust', icon: TrendingUp, label: 'Unit Trust Fund Management', color: C.navyLight, image: '/images/Services/Fund.png',
+    tagline: 'SEC-governed collective investment schemes',
+    desc: 'Our SEC-governed Unit Trust pools investor funds into 7 professionally managed portfolios — from equities and bonds to property and education funds. Starting from just K100/month, we make diversified investing accessible to every Zambian through our Retail Collective Investment Scheme.',
+    features: ['SEC authorised and monitored', '7 professionally managed funds', 'Start with as little as K100/month', 'Tripartite governance structure', 'Online portfolio tracking', 'No maximum investment limit'] },
+  { id: 'credit', icon: DollarSign, label: 'Credit', color: C.navyDark, image: '/images/Services/Credit.png',
+    tagline: 'Flexible financing solutions',
+    desc: 'Access tailored credit facilities designed to meet your personal and business funding needs. Backed by our deep understanding of Zambia\'s financial landscape, we provide competitive lending solutions that help you achieve your goals — whether it\'s growing a business, acquiring property, or bridging short-term cash flow gaps.',
+    features: ['Competitive interest rates', 'Flexible repayment terms', 'Personal and business credit', 'Quick turnaround on applications', 'Dedicated credit advisor', 'Transparent fee structure'] },
+  { id: 'securities', icon: BarChart2, label: 'Securities & Stock Broking', color: C.red, image: '/images/Services/Broker.png',
+    tagline: 'Trade on the Lusaka Securities Exchange',
+    desc: 'Buy and sell equities listed on the Lusaka Securities Exchange (LuSE) with expert guidance from our licensed brokers. We provide real-time market insights, research-driven recommendations, and efficient trade execution to help you build and manage your equity portfolio.',
+    features: ['Licensed LuSE broker', 'Real-time market data and insights', 'Research-driven trade recommendations', 'Efficient order execution', 'Portfolio monitoring and reporting', 'Access to IPOs and rights issues'] },
+  { id: 'advisory', icon: Briefcase, label: 'Consultancy & Advisory', color: C.navyLight, image: '/images/Services/Consult.png',
+    tagline: 'Expert financial guidance',
+    desc: 'Our licensed advisors provide personalised, objective investment guidance — from portfolio structuring and market analysis to comprehensive financial planning. Whether you are a first-time investor or a seasoned professional, we give you the insight and strategies you need to make confident financial decisions.',
+    features: ['Licensed, independent advisors', 'Comprehensive financial needs analysis', 'Market research and commentary', 'Investment proposal and planning', 'Ongoing monitoring and review', 'Multi-asset class coverage'] },
+  { id: 'risk', icon: AlertTriangle, label: 'Risk Management', color: C.navyDark, image: '/images/Services/Risk.png',
+    tagline: 'Protect and preserve your wealth',
+    desc: 'We identify, assess and mitigate financial risks across your portfolio using robust, institutional-grade frameworks. Our risk management service ensures your wealth is protected against market volatility, currency fluctuations, and economic uncertainty — giving you peace of mind as your investments grow.',
+    features: ['Comprehensive risk assessment', 'Portfolio stress testing', 'Currency and market risk mitigation', 'Regulatory compliance oversight', 'Ongoing risk monitoring', 'Custom risk reporting'] },
+];
+
+function ServicesPage({ onNavigate }) {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', minHeight: 'calc(100vh - 64px)' }}>
+      {/* Header */}
+      <div style={{
+        background: `linear-gradient(135deg, ${C.navyDark} 0%, ${C.navy} 100%)`,
+        padding: '40px 60px', position: 'relative', overflow: 'hidden',
+      }}>
+        <div style={{
+          position: 'absolute', inset: 0,
+          backgroundImage: 'linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px)',
+          backgroundSize: '60px 60px', pointerEvents: 'none',
+        }} />
+        <div style={{ position: 'relative', zIndex: 1, textAlign: 'center' }}>
+          <h1 style={{ fontFamily: font.serif, fontSize: 32, fontWeight: 700, color: C.white, marginBottom: 8 }}>Our Services</h1>
+          <p style={{ fontSize: 15, color: 'rgba(255,255,255,0.6)', maxWidth: 520, margin: '0 auto 24px' }}>
+            Six core services designed to manage, grow, and protect your wealth — from pension planning to securities trading.
+          </p>
+          <div style={{ display: 'flex', gap: 8, justifyContent: 'center', flexWrap: 'wrap' }}>
+            {servicesList.map(s => (
+              <a key={s.id} href={`#svc-${s.id}`} style={{
+                padding: '6px 14px', borderRadius: 100, fontSize: 12, fontWeight: 600,
+                background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.2)',
+                color: '#fff', transition: 'all 0.2s', cursor: 'pointer',
+              }}
+                onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.2)'}
+                onMouseLeave={e => e.currentTarget.style.background = 'rgba(255,255,255,0.1)'}
+              >{s.label}</a>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Service cards */}
+      <div style={{ flex: 1, padding: '40px 60px', background: C.offWhite }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 32 }}>
+          {servicesList.map(({ id, icon: Icon, label, tagline, desc, features, color, image }, i) => (
+            <div key={id} id={`svc-${id}`} style={{
+              display: 'grid', gridTemplateColumns: i % 2 === 0 ? '1fr 1.6fr' : '1.6fr 1fr',
+              background: C.white, borderRadius: 16, overflow: 'hidden',
+              boxShadow: '0 2px 8px rgba(0,0,0,0.06)', border: `1px solid ${C.gray100}`,
+            }}>
+              {/* Image panel — left on even, right on odd */}
+              {i % 2 === 0 && (
+                <div style={{ position: 'relative', overflow: 'hidden', minHeight: 280 }}>
+                  <img src={image} alt={label} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                  <div style={{ position: 'absolute', inset: 0, background: `linear-gradient(180deg, transparent 40%, ${color}cc 100%)`, pointerEvents: 'none' }} />
+                  <div style={{ position: 'absolute', bottom: 20, left: 0, right: 0, textAlign: 'center' }}>
+                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '8px 16px', borderRadius: 8, background: 'rgba(0,0,0,0.3)', backdropFilter: 'blur(4px)' }}>
+                      <Icon size={14} style={{ color: '#fff' }} />
+                      <span style={{ fontSize: 12, fontWeight: 700, color: '#fff' }}>{label}</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Text content */}
+              <div style={{ padding: 40 }}>
+                {i % 2 !== 0 && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 20 }}>
+                    <div style={{ width: 52, height: 52, borderRadius: 14, background: `${color}15`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <Icon size={24} style={{ color }} />
+                    </div>
+                    <div>
+                      <h3 style={{ fontFamily: font.serif, fontSize: 22, fontWeight: 700, color: C.gray900 }}>{label}</h3>
+                      <p style={{ fontSize: 13, color, fontWeight: 600 }}>{tagline}</p>
+                    </div>
+                  </div>
+                )}
+                {i % 2 === 0 && (
+                  <div style={{ marginBottom: 20 }}>
+                    <h3 style={{ fontFamily: font.serif, fontSize: 22, fontWeight: 700, color: C.gray900, marginBottom: 4 }}>{label}</h3>
+                    <p style={{ fontSize: 13, color, fontWeight: 600 }}>{tagline}</p>
+                  </div>
+                )}
+                <p style={{ fontSize: 15, color: C.gray600, lineHeight: 1.8, marginBottom: 24 }}>{desc}</p>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 24 }}>
+                  {features.map(f => (
+                    <div key={f} style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+                      <CheckCircle size={14} style={{ color, marginTop: 3, flexShrink: 0 }} />
+                      <span style={{ fontSize: 13, color: C.gray600, lineHeight: 1.5 }}>{f}</span>
+                    </div>
+                  ))}
+                </div>
+                <button onClick={() => onNavigate('contact')} style={{
+                  display: 'inline-flex', alignItems: 'center', gap: 8, padding: '12px 24px',
+                  background: color, color: C.white, fontWeight: 700, fontSize: 13,
+                  borderRadius: 6, border: 'none', cursor: 'pointer', fontFamily: font.sans,
+                  transition: 'all 0.2s',
+                }}
+                  onMouseEnter={e => e.currentTarget.style.opacity = '0.85'}
+                  onMouseLeave={e => e.currentTarget.style.opacity = '1'}
+                >Enquire Now <ArrowRight size={14} /></button>
+              </div>
+
+              {/* Image panel — right on odd */}
+              {i % 2 !== 0 && (
+                <div style={{ position: 'relative', overflow: 'hidden', minHeight: 280 }}>
+                  <img src={image} alt={label} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                  <div style={{ position: 'absolute', inset: 0, background: `linear-gradient(180deg, transparent 40%, ${color}cc 100%)`, pointerEvents: 'none' }} />
+                  <div style={{ position: 'absolute', bottom: 20, left: 0, right: 0, textAlign: 'center' }}>
+                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '8px 16px', borderRadius: 8, background: 'rgba(0,0,0,0.3)', backdropFilter: 'blur(4px)' }}>
+                      <Icon size={14} style={{ color: '#fff' }} />
+                      <span style={{ fontSize: 12, fontWeight: 700, color: '#fff' }}>{label}</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+
+        {/* CTA */}
+        <div style={{
+          marginTop: 40, padding: '48px 40px', borderRadius: 16, textAlign: 'center',
+          background: `linear-gradient(135deg, ${C.navy}, ${C.navyDark})`,
+        }}>
+          <h2 style={{ fontFamily: font.serif, fontSize: 26, fontWeight: 700, color: C.white, marginBottom: 12 }}>Not Sure Where to Start?</h2>
+          <p style={{ color: 'rgba(255,255,255,0.65)', fontSize: 15, marginBottom: 28 }}>Our advisors will help you find the right service for your goals.</p>
+          <button onClick={() => onNavigate('contact')} style={{
+            display: 'inline-flex', alignItems: 'center', gap: 8, padding: '14px 28px',
+            background: C.red, color: C.white, fontWeight: 700, fontSize: 14,
+            borderRadius: 8, border: 'none', cursor: 'pointer', fontFamily: font.sans,
+          }}
+            onMouseEnter={e => e.currentTarget.style.background = C.redHover}
+            onMouseLeave={e => e.currentTarget.style.background = C.red}
+          >Book a Free Consultation <ArrowRight size={14} /></button>
+        </div>
+      </div>
+
+      <MarketTicker />
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════ */
 /*  MAIN APP                                  */
 /* ═══════════════════════════════════════════ */
 export default function App() {
@@ -1228,7 +1393,14 @@ export default function App() {
       { label: 'Our Team', action: () => navigate('about') },
       { label: 'Core Values', action: () => navigate('about') },
     ]},
-    { label: 'Products', hasDropdown: true, items: funds.map(f => ({ label: f.short, action: () => navigate('fund', f.id) })) },
+    { label: 'Products', hasDropdown: true, items: [
+      { label: 'Pension Fund Management', action: () => navigate('products') },
+      { label: 'Unit Trust Fund Management', action: () => navigate('products') },
+      { label: 'Credit', action: () => navigate('products') },
+      { label: 'Securities & Stock Broking', action: () => navigate('products') },
+      { label: 'Consultancy & Advisory', action: () => navigate('products') },
+      { label: 'Risk Management', action: () => navigate('products') },
+    ]},
     { label: 'Governance', action: () => navigate('about') },
     { label: 'Insights', action: () => navigate('insights') },
     { label: 'Tools', action: () => navigate('tools') },
@@ -1315,7 +1487,7 @@ export default function App() {
       <div ref={scrollRef} style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden' }}>
         {page === 'home' && <HomePage onNavigate={navigate} />}
         {page === 'fund' && <FundDetailPage fundId={fundId} onNavigate={navigate} />}
-        {page === 'products' && <HomePage onNavigate={navigate} />}
+        {page === 'products' && <ServicesPage onNavigate={navigate} />}
         {page === 'insights' && <InsightsPage onNavigate={navigate} />}
         {page === 'about' && <AboutPage />}
         {page === 'contact' && <ContactPage />}
