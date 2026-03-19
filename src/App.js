@@ -664,8 +664,108 @@ function ReturnCalculator({ fund }) {
 /* ═══════════════════════════════════════════ */
 /*  INSIGHTS & MARKET DATA                    */
 /* ═══════════════════════════════════════════ */
+
+/* ── Dual-line comparison chart ── */
+function ComparisonChart({ data1, data2, label1, label2, color1 = C.red, color2 = C.gray400, width = 520, height = 200 }) {
+  const all = [...data1, ...data2];
+  const max = Math.max(...all.map(d => d.value));
+  const min = Math.min(...all.map(d => d.value));
+  const range = max - min || 1;
+  const padY = 24;
+  const padX = 0;
+
+  const toPoints = (data) => data.map((d, i) => {
+    const x = padX + (i / (data.length - 1)) * (width - padX * 2);
+    const y = height - padY - ((d.value - min) / range) * (height - padY * 2);
+    return `${x},${y}`;
+  }).join(' ');
+
+  const pts1 = toPoints(data1);
+  const pts2 = toPoints(data2);
+
+  return (
+    <div>
+      <svg width="100%" height="100%" viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none" style={{ display: 'block' }}>
+        {/* Grid */}
+        {[0.25, 0.5, 0.75].map(pct => (
+          <line key={pct} x1={padX} y1={padY + pct * (height - padY * 2)} x2={width - padX} y2={padY + pct * (height - padY * 2)} stroke="rgba(0,0,0,0.05)" strokeWidth="1" strokeDasharray="4,4" />
+        ))}
+        {/* Market line (behind) */}
+        <polyline points={pts2} fill="none" stroke={color2} strokeWidth="2" strokeLinecap="round" strokeDasharray="6,4" opacity="0.6" />
+        {/* Longhorn line (front) */}
+        <defs>
+          <linearGradient id={`cg-${color1.replace('#','')}`} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor={color1} stopOpacity="0.2" /><stop offset="100%" stopColor={color1} stopOpacity="0.02" />
+          </linearGradient>
+        </defs>
+        <polygon points={`${pts1} ${width - padX},${height - padY} ${padX},${height - padY}`} fill={`url(#cg-${color1.replace('#','')})`} />
+        <polyline points={pts1} fill="none" stroke={color1} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+        {/* Month labels */}
+        {data1.map((d, i) => {
+          if (i % 2 !== 0 && i !== data1.length - 1) return null;
+          const x = padX + (i / (data1.length - 1)) * (width - padX * 2);
+          return <text key={i} x={x} y={height - 4} textAnchor="middle" fontSize="9" fill={C.gray400} fontFamily={font.sans}>{d.month}</text>;
+        })}
+      </svg>
+      {/* Legend */}
+      <div style={{ display: 'flex', gap: 20, marginTop: 8 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <div style={{ width: 20, height: 3, borderRadius: 2, background: color1 }} />
+          <span style={{ fontSize: 11, fontWeight: 600, color: C.gray600 }}>{label1}</span>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <div style={{ width: 20, height: 3, borderRadius: 2, background: color2, opacity: 0.6 }} />
+          <span style={{ fontSize: 11, fontWeight: 600, color: C.gray400 }}>{label2}</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ── Generate comparison data pairs ── */
+function genPair(months, lhGrowth, mktGrowth) {
+  const mo = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const d1 = [], d2 = [];
+  let v1 = 100, v2 = 100;
+  for (let i = 0; i < months; i++) {
+    v1 *= (1 + lhGrowth / 12 + (Math.random() - 0.45) * 0.015);
+    v2 *= (1 + mktGrowth / 12 + (Math.random() - 0.45) * 0.02);
+    d1.push({ month: mo[i % 12], value: v1 });
+    d2.push({ month: mo[i % 12], value: v2 });
+  }
+  return [d1, d2];
+}
+
+/* ── Fund vs Market instrument mapping ── */
+const fundComparisons = {
+  short: [
+    { fund: 'Fixed Income Fund', instrument: '91-Day T-Bills', lhReturn: '8.2%', mktReturn: '6.8%', lhGrowth: 0.082, mktGrowth: 0.068, tier: 'Short Term' },
+    { fund: 'Gratuity Fund', instrument: 'Money Market Rate', lhReturn: '9.2%', mktReturn: '7.5%', lhGrowth: 0.092, mktGrowth: 0.075, tier: 'Short Term' },
+  ],
+  medium: [
+    { fund: 'Multi Assets Fund', instrument: 'Gov Bonds (5Y)', lhReturn: '10.1%', mktReturn: '8.4%', lhGrowth: 0.101, mktGrowth: 0.084, tier: 'Medium Term' },
+    { fund: 'Education Fund', instrument: 'Corporate Bonds', lhReturn: '9.8%', mktReturn: '7.9%', lhGrowth: 0.098, mktGrowth: 0.079, tier: 'Medium Term' },
+    { fund: 'White Coat Fund', instrument: 'BoZ Savings Rate', lhReturn: '8.9%', mktReturn: '6.2%', lhGrowth: 0.089, mktGrowth: 0.062, tier: 'Medium Term' },
+  ],
+  long: [
+    { fund: 'Listed Equities Fund', instrument: 'LuSE All Share Index', lhReturn: '12.4%', mktReturn: '9.4%', lhGrowth: 0.124, mktGrowth: 0.094, tier: 'Long Term' },
+    { fund: 'Listed Property Fund', instrument: 'Property Index', lhReturn: '9.6%', mktReturn: '7.1%', lhGrowth: 0.096, mktGrowth: 0.071, tier: 'Long Term' },
+  ],
+};
+
+/* ── Market snapshot data ── */
+const marketSnapshot = [
+  { label: 'Inflation Rate', value: '12.3%', change: '+0.2%', negative: true },
+  { label: 'BoZ Policy Rate', value: '12.5%', change: 'Unchanged', negative: false },
+  { label: 'LuSE ASI Daily', value: '+0.34%', change: '+9.4% YTD', negative: false },
+  { label: 'USD / ZMW', value: '27.10', change: '-0.5%', negative: false },
+  { label: '10Y Bond Yield', value: '16.8%', change: '+0.3%', negative: true },
+  { label: '91-Day T-Bill', value: '11.2%', change: '-0.1%', negative: false },
+];
+
+/* ── News items ── */
 const newsItems = [
-  { title: 'Longhorn Associates Igesa Garzonrial Meeting 2024', date: 'Nov 2024', cat: 'Events', excerpt: 'Annual general meeting highlights and key resolutions from the 2024 session.' },
+  { title: 'Longhorn Associates Annual General Meeting 2024', date: 'Nov 2024', cat: 'Events', excerpt: 'Annual general meeting highlights and key resolutions from the 2024 session.' },
   { title: 'Client Engagement Seminar', date: 'Oct 2024', cat: 'Events', excerpt: 'Opportunities shared as we outlined wealth creation strategies for our investors.' },
   { title: 'End of Year Team Building', date: 'Dec 2024', cat: 'Company', excerpt: 'Remembering milestones and celebrating our team\'s achievements.' },
   { title: 'Understanding the 7 Unit Trust Funds', date: 'Jan 2025', cat: 'Education', excerpt: 'From Listed Equities to the White Coat Fund — fees, risks & suitability.' },
@@ -675,77 +775,165 @@ const newsItems = [
 
 function InsightsPage({ onNavigate }) {
   const [tab, setTab] = useState('markets');
-  const tabs = ['Markets', 'Funds', 'Economy', 'Education'];
-  const chartData = genChart(12, 100, 0.09);
+  const tabs = ['Markets', 'Funds', 'News & Events'];
+  const tabKeys = ['markets', 'funds', 'news'];
+
+  /* Pre-generate chart data for overview */
+  const [overviewLH] = useState(() => genPair(12, 0.10, 0.075));
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', minHeight: 'calc(100vh - 64px)' }}>
       {/* Header */}
       <div style={{ background: `linear-gradient(135deg, ${C.navyDark} 0%, ${C.navy} 100%)`, padding: '32px 60px' }}>
         <h1 style={{ fontFamily: font.serif, fontSize: 30, fontWeight: 700, color: C.white, marginBottom: 4 }}>Insights & Market Data</h1>
-        <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.5)' }}>Stay informed with the latest market trends and investment insights</p>
+        <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.5)' }}>Longhorn fund performance vs market instruments · General market indicators</p>
       </div>
 
       {/* Tabs */}
       <div style={{ display: 'flex', background: C.white, padding: '0 60px', borderBottom: `1px solid ${C.gray100}` }}>
-        {tabs.map(t => (
-          <button key={t} onClick={() => setTab(t.toLowerCase())} style={{
+        {tabs.map((t, idx) => (
+          <button key={t} onClick={() => setTab(tabKeys[idx])} style={{
             padding: '14px 24px', border: 'none', cursor: 'pointer', fontFamily: font.sans,
-            fontSize: 14, fontWeight: tab === t.toLowerCase() ? 700 : 500,
-            color: tab === t.toLowerCase() ? C.navy : C.gray400,
-            borderBottom: tab === t.toLowerCase() ? `3px solid ${C.navy}` : '3px solid transparent',
+            fontSize: 14, fontWeight: tab === tabKeys[idx] ? 700 : 500,
+            color: tab === tabKeys[idx] ? C.navy : C.gray400,
+            borderBottom: tab === tabKeys[idx] ? `3px solid ${C.red}` : '3px solid transparent',
             background: 'transparent', transition: 'all 0.2s',
           }}>{t}</button>
         ))}
       </div>
 
-      {/* Chart + Stats */}
-      <div style={{ display: 'flex', padding: '24px 60px', background: C.offWhite, borderBottom: `1px solid ${C.gray100}` }}>
-        <div style={{ flex: 1, height: 220, border: `1px solid ${C.gray100}`, borderRadius: 12, padding: 16, background: C.white, marginRight: 24 }}>
-          <MiniChart data={chartData} width={540} height={190} color={C.navy} />
+      {/* ═══ MARKETS TAB ═══ */}
+      {tab === 'markets' && (
+        <div style={{ flex: 1, padding: '28px 60px', background: C.offWhite }}>
+          {/* Market Snapshot Cards */}
+          <div style={{ marginBottom: 28 }}>
+            <h3 style={{ fontFamily: font.serif, fontSize: 18, fontWeight: 700, color: C.gray900, marginBottom: 16 }}>Market Snapshot</h3>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 12 }}>
+              {marketSnapshot.map(({ label, value, change, negative }) => (
+                <div key={label} style={{ padding: '16px 14px', borderRadius: 12, background: C.white, border: `1px solid ${C.gray100}` }}>
+                  <div style={{ fontSize: 11, color: C.gray400, fontWeight: 600, marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{label}</div>
+                  <div style={{ fontSize: 22, fontWeight: 800, color: C.gray900, fontFamily: font.serif, marginBottom: 4 }}>{value}</div>
+                  <div style={{ fontSize: 11, fontWeight: 600, color: negative ? '#DC2626' : C.green }}>{change}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Overall Performance Comparison */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 280px', gap: 20, marginBottom: 28 }}>
+            <div style={{ padding: 20, borderRadius: 14, background: C.white, border: `1px solid ${C.gray100}` }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+                <div>
+                  <h3 style={{ fontFamily: font.serif, fontSize: 17, fontWeight: 700, color: C.gray900 }}>Longhorn Portfolio vs Market (12M)</h3>
+                  <p style={{ fontSize: 12, color: C.gray400, marginTop: 2 }}>Blended fund performance against weighted market benchmark</p>
+                </div>
+              </div>
+              <div style={{ height: 200 }}>
+                <ComparisonChart data1={overviewLH[0]} data2={overviewLH[1]} label1="Longhorn Blended" label2="Market Benchmark" color1={C.red} color2={C.gray300} />
+              </div>
+            </div>
+
+            {/* Performance Summary */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              {[
+                { label: 'Longhorn Avg Return', value: '10.0%', sub: 'Blended across 7 funds', color: C.red },
+                { label: 'Market Benchmark', value: '7.5%', sub: 'Weighted instrument avg', color: C.gray500 },
+                { label: 'Outperformance', value: '+2.5%', sub: 'Alpha generated', color: C.green },
+              ].map(({ label, value, sub, color }) => (
+                <div key={label} style={{ padding: 16, borderRadius: 12, background: C.white, border: `1px solid ${C.gray100}`, flex: 1 }}>
+                  <div style={{ fontSize: 11, color: C.gray400, fontWeight: 600, marginBottom: 4 }}>{label}</div>
+                  <div style={{ fontSize: 26, fontWeight: 800, color, fontFamily: font.serif }}>{value}</div>
+                  <div style={{ fontSize: 11, color: C.gray400, marginTop: 2 }}>{sub}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <MarketTicker />
         </div>
-        <div style={{ width: 220 }}>
+      )}
+
+      {/* ═══ FUNDS TAB ═══ */}
+      {tab === 'funds' && (
+        <div style={{ flex: 1, padding: '28px 60px', background: C.offWhite }}>
           {[
-            { label: 'Annual Return', value: '8.2%', color: C.red },
-            { label: 'Fund Size', value: 'K250M', color: C.gray900 },
-            { label: 'Volatility', value: '3.5%', color: C.gray900 },
-            { label: 'Expense Ratio', value: '1.2%', color: C.gray900 },
-          ].map(({ label, value, color }) => (
-            <div key={label} style={{ marginBottom: 16 }}>
-              <div style={{ fontSize: 11, color: C.gray400, fontWeight: 600 }}>{label}</div>
-              <div style={{ fontSize: 22, fontWeight: 800, color, fontFamily: font.serif }}>{value}</div>
+            { key: 'short', label: 'Short Term (0–1 Year)', color: C.navyLight, items: fundComparisons.short },
+            { key: 'medium', label: 'Medium Term (1–5 Years)', color: C.navy, items: fundComparisons.medium },
+            { key: 'long', label: 'Long Term (5+ Years)', color: C.navyDark, items: fundComparisons.long },
+          ].map(({ key, label, color: tierColor, items }) => (
+            <div key={key} style={{ marginBottom: 36 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
+                <div style={{ width: 4, height: 24, borderRadius: 2, background: tierColor }} />
+                <h3 style={{ fontFamily: font.serif, fontSize: 18, fontWeight: 700, color: C.gray900 }}>{label}</h3>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: items.length === 2 ? '1fr 1fr' : 'repeat(3, 1fr)', gap: 16 }}>
+                {items.map((comp) => {
+                  const [d1, d2] = genPair(12, comp.lhGrowth, comp.mktGrowth);
+                  const diff = (parseFloat(comp.lhReturn) - parseFloat(comp.mktReturn)).toFixed(1);
+                  return (
+                    <div key={comp.fund} style={{ padding: 20, borderRadius: 14, background: C.white, border: `1px solid ${C.gray100}` }}>
+                      {/* Header */}
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
+                        <div>
+                          <div style={{ fontSize: 14, fontWeight: 700, color: C.gray900, marginBottom: 2 }}>{comp.fund}</div>
+                          <div style={{ fontSize: 11, color: C.gray400 }}>vs {comp.instrument}</div>
+                        </div>
+                        <div style={{ padding: '4px 10px', borderRadius: 6, background: `${C.green}15`, fontSize: 12, fontWeight: 700, color: C.green }}>+{diff}%</div>
+                      </div>
+                      {/* Chart */}
+                      <div style={{ height: 130, marginBottom: 12 }}>
+                        <ComparisonChart data1={d1} data2={d2} label1={comp.fund} label2={comp.instrument} color1={C.red} color2={C.gray300} width={300} height={120} />
+                      </div>
+                      {/* Returns row */}
+                      <div style={{ display: 'flex', gap: 8 }}>
+                        <div style={{ flex: 1, padding: '8px 10px', borderRadius: 8, background: `${C.red}08`, textAlign: 'center' }}>
+                          <div style={{ fontSize: 10, color: C.gray400, fontWeight: 600, marginBottom: 2 }}>Longhorn</div>
+                          <div style={{ fontSize: 16, fontWeight: 800, color: C.red, fontFamily: font.serif }}>{comp.lhReturn}</div>
+                        </div>
+                        <div style={{ flex: 1, padding: '8px 10px', borderRadius: 8, background: C.gray50, textAlign: 'center' }}>
+                          <div style={{ fontSize: 10, color: C.gray400, fontWeight: 600, marginBottom: 2 }}>Market</div>
+                          <div style={{ fontSize: 16, fontWeight: 800, color: C.gray600, fontFamily: font.serif }}>{comp.mktReturn}</div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           ))}
-        </div>
-      </div>
 
-      <MarketTicker />
-
-      {/* Insights & Events */}
-      <div style={{ padding: '32px 60px', background: C.white, flex: 1 }}>
-        <h2 style={{ fontFamily: font.serif, fontSize: 22, fontWeight: 700, color: C.gray900, marginBottom: 20 }}>Insights & Events</h2>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 20 }}>
-          {newsItems.slice(0, 3).map(item => (
-            <div key={item.title} style={{
-              background: C.white, borderRadius: 12, overflow: 'hidden',
-              border: `1px solid ${C.gray100}`, transition: 'all 0.25s', cursor: 'pointer',
-            }}
-              onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-3px)'; e.currentTarget.style.boxShadow = '0 8px 24px rgba(0,0,0,0.08)'; }}
-              onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = 'none'; }}
-            >
-              <div style={{ height: 140, background: `linear-gradient(135deg, ${C.navy}, ${C.navyLight})`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <Newspaper size={32} style={{ color: 'rgba(255,255,255,0.3)' }} />
-              </div>
-              <div style={{ padding: 18 }}>
-                <span style={{ fontSize: 10, fontWeight: 700, color: C.red, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{item.cat}</span>
-                <h3 style={{ fontFamily: font.serif, fontSize: 15, fontWeight: 700, color: C.gray900, marginTop: 6, marginBottom: 8, lineHeight: 1.3 }}>{item.title}</h3>
-                <p style={{ fontSize: 12, color: C.gray500, lineHeight: 1.5 }}>{item.excerpt}</p>
-                <div style={{ fontSize: 11, color: C.gray400, marginTop: 10 }}>{item.date}</div>
-              </div>
-            </div>
-          ))}
+          <MarketTicker />
         </div>
-      </div>
+      )}
+
+      {/* ═══ NEWS & EVENTS TAB ═══ */}
+      {tab === 'news' && (
+        <div style={{ flex: 1, padding: '28px 60px', background: C.offWhite }}>
+          <h3 style={{ fontFamily: font.serif, fontSize: 20, fontWeight: 700, color: C.gray900, marginBottom: 20 }}>Latest News & Events</h3>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 20 }}>
+            {newsItems.map(item => (
+              <div key={item.title} style={{
+                background: C.white, borderRadius: 12, overflow: 'hidden',
+                border: `1px solid ${C.gray100}`, transition: 'all 0.25s', cursor: 'pointer',
+              }}
+                onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-3px)'; e.currentTarget.style.boxShadow = '0 8px 24px rgba(0,0,0,0.08)'; }}
+                onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = 'none'; }}
+              >
+                <div style={{ height: 120, background: `linear-gradient(135deg, ${C.navy}, ${C.navyLight})`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <Newspaper size={28} style={{ color: 'rgba(255,255,255,0.3)' }} />
+                </div>
+                <div style={{ padding: 18 }}>
+                  <span style={{ fontSize: 10, fontWeight: 700, color: C.red, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{item.cat}</span>
+                  <h3 style={{ fontFamily: font.serif, fontSize: 15, fontWeight: 700, color: C.gray900, marginTop: 6, marginBottom: 8, lineHeight: 1.3 }}>{item.title}</h3>
+                  <p style={{ fontSize: 12, color: C.gray500, lineHeight: 1.5 }}>{item.excerpt}</p>
+                  <div style={{ fontSize: 11, color: C.gray400, marginTop: 10 }}>{item.date}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
