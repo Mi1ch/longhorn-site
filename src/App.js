@@ -53,17 +53,62 @@ function genChart(months=12, base=100, growth=0.08) {
 }
 
 /* ═══════════════════════════════════════════ */
-/*  MARKET TICKER                             */
+/*  LONGHORN API CONFIG                        */
 /* ═══════════════════════════════════════════ */
+const LONGHORN_API = process.env.REACT_APP_LONGHORN_API || 'https://longhorn-api.onrender.com';
+
+/* ═══════════════════════════════════════════ */
+/*  MARKET TICKER (Longhorn API)               */
+/* ═══════════════════════════════════════════ */
+const FALLBACK_TICKER = [
+  { label: 'Market Updates', value: '', isLabel: true },
+  { label: 'LuSE ASI', value: '+9.4%', positive: true },
+  { label: 'USD/ZMW', value: '27.10' },
+  { label: '10Y Bond Yield', value: '16.8%' },
+  { label: 'Inflation', value: '12.3%' },
+  { label: 'BoZ Rate', value: '12.5%' },
+];
+
 function MarketTicker() {
-  const items = [
-    { label: 'Market Updates', value: '', isLabel: true },
-    { label: 'LuSE ASI', value: '+9.4%', positive: true },
-    { label: 'USD/ZMW', value: '27.10' },
-    { label: '10Y Bond Yield', value: '16.8%' },
-    { label: 'Inflation', value: '12.3%' },
-    { label: 'BoZ Rate', value: '12.5%' },
-  ];
+  const [items, setItems] = useState(FALLBACK_TICKER);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    /* ── Always fetch root message first ── */
+    fetch(`${LONGHORN_API}/`)
+      .then(r => r.json())
+      .then(data => {
+        if (cancelled) return;
+        if (data.message) {
+          setItems([
+            { label: 'Longhorn API', value: '', isLabel: true },
+            { label: 'Status', value: data.message, positive: true },
+          ]);
+        }
+      })
+      .catch(() => { /* Root unreachable — keep fallback */ });
+
+    /* ── Then try /api/stock-prices/ — if it has real data, override ── */
+    fetch(`${LONGHORN_API}/api/stock-prices/`)
+      .then(r => { if (!r.ok) throw new Error(r.status); return r.json(); })
+      .then(data => {
+        if (cancelled) return;
+        const rows = Array.isArray(data) ? data : data.results || [];
+        if (rows.length > 0) {
+          setItems(rows.map(d => ({
+            label: d.label || d.name || d.symbol || '',
+            value: d.value || d.price || d.change || '',
+            positive: d.is_positive || d.positive || (d.change && !String(d.change).startsWith('-')) || false,
+            isLabel: d.is_label_badge || d.isLabel || false,
+          })));
+        }
+      })
+      .catch(() => { /* stock-prices not ready yet — root message stays */ });
+
+    return () => { cancelled = true; };
+  }, []);
+
   const tickerItems = [...items, ...items, ...items]; /* triple for seamless loop */
   return (
     <div style={{
@@ -323,22 +368,10 @@ function HomePage({ onNavigate }) {
           ))}
         </div>
 
-        {/* Progress bar */}
-        <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 3, background: 'rgba(255,255,255,0.1)', zIndex: 10 }}>
-          <div key={`prog-${currentSlide}`} style={{
-            height: '100%', background: C.red, borderRadius: '0 2px 2px 0',
-            animation: 'heroProgress 6s linear both',
-          }} />
-        </div>
-
         <style>{`
           @keyframes heroFadeUp {
             from { opacity: 0; transform: translateY(16px); }
             to { opacity: 1; transform: translateY(0); }
-          }
-          @keyframes heroProgress {
-            from { width: 0%; }
-            to { width: 100%; }
           }
         `}</style>
       </div>
@@ -538,7 +571,7 @@ function FundDetailPage({ fundId, onNavigate }) {
 /* ═══════════════════════════════════════════ */
 /*  RETURN PROJECTION CALCULATOR              */
 /* ═══════════════════════════════════════════ */
-function ReturnCalculator({ fund }) {
+function ReturnCalculator({ fund, onNavigate }) {
   const [initial, setInitial] = useState(20000);
   const [monthly, setMonthly] = useState(2000);
   const [horizon, setHorizon] = useState(5);
@@ -648,10 +681,7 @@ function ReturnCalculator({ fund }) {
           </div>
 
           <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
-            <button style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '10px 18px', borderRadius: 6, border: `1px solid ${C.gray200}`, background: C.white, cursor: 'pointer', fontFamily: font.sans, fontSize: 12, fontWeight: 600, color: C.gray600 }}>
-              <CheckCircle size={14} /> Save Scenario
-            </button>
-            <button onClick={() => onNavigate('portal')} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '10px 18px', borderRadius: 6, border: 'none', background: C.red, color: C.white, cursor: 'pointer', fontFamily: font.sans, fontSize: 12, fontWeight: 700 }}>
+            <button onClick={() => onNavigate && onNavigate('portal')} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '10px 18px', borderRadius: 6, border: 'none', background: C.red, color: C.white, cursor: 'pointer', fontFamily: font.sans, fontSize: 12, fontWeight: 700 }}>
               Start Investing <ArrowRight size={14} />
             </button>
           </div>
@@ -666,40 +696,82 @@ function ReturnCalculator({ fund }) {
 /* ═══════════════════════════════════════════ */
 
 /* ── Dual-line comparison chart ── */
-function ComparisonChart({ data1, data2, label1, label2, color1 = C.red, color2 = C.gray400, width = 520, height = 200 }) {
+function ComparisonChart({ data1, data2, label1, label2, color1 = C.red, color2 = C.navyLight, width = 520, height = 200 }) {
   const all = [...data1, ...data2];
   const max = Math.max(...all.map(d => d.value));
   const min = Math.min(...all.map(d => d.value));
   const range = max - min || 1;
   const padY = 24;
-  const padX = 0;
+  const padX = 15;
 
-  const toPoints = (data) => data.map((d, i) => {
-    const x = padX + (i / (data.length - 1)) * (width - padX * 2);
-    const y = height - padY - ((d.value - min) / range) * (height - padY * 2);
-    return `${x},${y}`;
-  }).join(' ');
+  /* Convert data to x,y coordinates */
+  const toCoords = (data) => data.map((d, i) => ({
+    x: padX + (i / (data.length - 1)) * (width - padX * 2),
+    y: height - padY - ((d.value - min) / range) * (height - padY * 2),
+  }));
 
-  const pts1 = toPoints(data1);
-  const pts2 = toPoints(data2);
+  /* Smooth cubic bezier path from coordinates */
+  const toSmoothPath = (coords) => {
+    if (coords.length < 2) return '';
+    let d = `M ${coords[0].x},${coords[0].y}`;
+    for (let i = 0; i < coords.length - 1; i++) {
+      const p0 = coords[Math.max(0, i - 1)];
+      const p1 = coords[i];
+      const p2 = coords[i + 1];
+      const p3 = coords[Math.min(coords.length - 1, i + 2)];
+      const tension = 0.35;
+      const cp1x = p1.x + (p2.x - p0.x) * tension;
+      const cp1y = p1.y + (p2.y - p0.y) * tension;
+      const cp2x = p2.x - (p3.x - p1.x) * tension;
+      const cp2y = p2.y - (p3.y - p1.y) * tension;
+      d += ` C ${cp1x},${cp1y} ${cp2x},${cp2y} ${p2.x},${p2.y}`;
+    }
+    return d;
+  };
+
+  /* Smooth area path (closed) */
+  const toAreaPath = (coords) => {
+    const linePath = toSmoothPath(coords);
+    const last = coords[coords.length - 1];
+    const first = coords[0];
+    return `${linePath} L ${last.x},${height - padY} L ${first.x},${height - padY} Z`;
+  };
+
+  const coords1 = toCoords(data1);
+  const coords2 = toCoords(data2);
+  const path1 = toSmoothPath(coords1);
+  const path2 = toSmoothPath(coords2);
+  const area1 = toAreaPath(coords1);
+  const uid = `cg-${color1.replace('#','')}-${Math.random().toString(36).slice(2,6)}`;
 
   return (
     <div>
       <svg width="100%" height="100%" viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none" style={{ display: 'block' }}>
+        <defs>
+          <linearGradient id={uid} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor={color1} stopOpacity="0.25" />
+            <stop offset="100%" stopColor={color1} stopOpacity="0.02" />
+          </linearGradient>
+        </defs>
         {/* Grid */}
         {[0.25, 0.5, 0.75].map(pct => (
           <line key={pct} x1={padX} y1={padY + pct * (height - padY * 2)} x2={width - padX} y2={padY + pct * (height - padY * 2)} stroke="rgba(0,0,0,0.05)" strokeWidth="1" strokeDasharray="4,4" />
         ))}
-        {/* Market line (behind) */}
-        <polyline points={pts2} fill="none" stroke={color2} strokeWidth="2" strokeLinecap="round" strokeDasharray="6,4" opacity="0.6" />
-        {/* Longhorn line (front) */}
-        <defs>
-          <linearGradient id={`cg-${color1.replace('#','')}`} x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor={color1} stopOpacity="0.2" /><stop offset="100%" stopColor={color1} stopOpacity="0.02" />
-          </linearGradient>
-        </defs>
-        <polygon points={`${pts1} ${width - padX},${height - padY} ${padX},${height - padY}`} fill={`url(#cg-${color1.replace('#','')})`} />
-        <polyline points={pts1} fill="none" stroke={color1} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+        {/* Market line (behind) — thinner, dashed, muted */}
+        <path d={path2} fill="none" stroke={color2} strokeWidth="1.5" strokeLinecap="round" strokeDasharray="8,5" opacity="0.5" />
+        {/* Market end dot */}
+        {coords2.length > 0 && <circle cx={coords2[coords2.length-1].x} cy={coords2[coords2.length-1].y} r="3" fill={color2} opacity="0.5" />}
+        {/* Longhorn area fill */}
+        <path d={area1} fill={`url(#${uid})`} />
+        {/* Longhorn line (front) — solid, clear */}
+        <path d={path1} fill="none" stroke={color1} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+        {/* Longhorn end dot with glow */}
+        {coords1.length > 0 && (
+          <>
+            <circle cx={coords1[coords1.length-1].x} cy={coords1[coords1.length-1].y} r="8" fill={color1} opacity="0.15" />
+            <circle cx={coords1[coords1.length-1].x} cy={coords1[coords1.length-1].y} r="4.5" fill={color1} stroke="#fff" strokeWidth="2" />
+          </>
+        )}
         {/* Month labels */}
         {data1.map((d, i) => {
           if (i % 2 !== 0 && i !== data1.length - 1) return null;
@@ -707,15 +779,15 @@ function ComparisonChart({ data1, data2, label1, label2, color1 = C.red, color2 
           return <text key={i} x={x} y={height - 4} textAnchor="middle" fontSize="9" fill={C.gray400} fontFamily={font.sans}>{d.month}</text>;
         })}
       </svg>
-      {/* Legend */}
-      <div style={{ display: 'flex', gap: 20, marginTop: 8 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <div style={{ width: 20, height: 3, borderRadius: 2, background: color1 }} />
-          <span style={{ fontSize: 11, fontWeight: 600, color: C.gray600 }}>{label1}</span>
+      {/* Legend — clearer distinction */}
+      <div style={{ display: 'flex', gap: 24, marginTop: 10 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div style={{ width: 24, height: 4, borderRadius: 2, background: color1 }} />
+          <span style={{ fontSize: 11, fontWeight: 700, color: color1 }}>{label1}</span>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <div style={{ width: 20, height: 3, borderRadius: 2, background: color2, opacity: 0.6 }} />
-          <span style={{ fontSize: 11, fontWeight: 600, color: C.gray400 }}>{label2}</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div style={{ width: 24, height: 2, borderRadius: 2, background: color2, opacity: 0.5 }} />
+          <span style={{ fontSize: 11, fontWeight: 500, color: C.gray400 }}>{label2}</span>
         </div>
       </div>
     </div>
@@ -728,8 +800,8 @@ function genPair(months, lhGrowth, mktGrowth) {
   const d1 = [], d2 = [];
   let v1 = 100, v2 = 100;
   for (let i = 0; i < months; i++) {
-    v1 *= (1 + lhGrowth / 12 + (Math.random() - 0.45) * 0.015);
-    v2 *= (1 + mktGrowth / 12 + (Math.random() - 0.45) * 0.02);
+    v1 *= (1 + lhGrowth / 12 + (Math.random() - 0.48) * 0.008);
+    v2 *= (1 + mktGrowth / 12 + (Math.random() - 0.48) * 0.01);
     d1.push({ month: mo[i % 12], value: v1 });
     d2.push({ month: mo[i % 12], value: v2 });
   }
@@ -775,6 +847,7 @@ const newsItems = [
 
 function InsightsPage({ onNavigate }) {
   const [tab, setTab] = useState('markets');
+  const [selectedNews, setSelectedNews] = useState(null);
   const tabs = ['Markets', 'Funds', 'News & Events'];
   const tabKeys = ['markets', 'funds', 'news'];
 
@@ -783,23 +856,27 @@ function InsightsPage({ onNavigate }) {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', minHeight: 'calc(100vh - 64px)' }}>
-      {/* Header */}
+      {/* Ticker above banner */}
+      <MarketTicker />
+      {/* Header with tabs */}
       <div style={{ background: `linear-gradient(135deg, ${C.navyDark} 0%, ${C.navy} 100%)`, padding: '32px 60px' }}>
-        <h1 style={{ fontFamily: font.serif, fontSize: 30, fontWeight: 700, color: C.white, marginBottom: 4 }}>Insights & Market Data</h1>
-        <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.5)' }}>Longhorn fund performance vs market instruments · General market indicators</p>
-      </div>
-
-      {/* Tabs */}
-      <div style={{ display: 'flex', background: C.white, padding: '0 60px', borderBottom: `1px solid ${C.gray100}` }}>
-        {tabs.map((t, idx) => (
-          <button key={t} onClick={() => setTab(tabKeys[idx])} style={{
-            padding: '14px 24px', border: 'none', cursor: 'pointer', fontFamily: font.sans,
-            fontSize: 14, fontWeight: tab === tabKeys[idx] ? 700 : 500,
-            color: tab === tabKeys[idx] ? C.navy : C.gray400,
-            borderBottom: tab === tabKeys[idx] ? `3px solid ${C.red}` : '3px solid transparent',
-            background: 'transparent', transition: 'all 0.2s',
-          }}>{t}</button>
-        ))}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
+          <div>
+            <h1 style={{ fontFamily: font.serif, fontSize: 30, fontWeight: 700, color: C.white, marginBottom: 4 }}>Insights & Market Data</h1>
+            <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.5)' }}>Longhorn fund performance vs market instruments · General market indicators</p>
+          </div>
+          <div style={{ display: 'flex', gap: 4 }}>
+            {tabs.map((t, idx) => (
+              <button key={t} onClick={() => setTab(tabKeys[idx])} style={{
+                padding: '8px 18px', border: 'none', cursor: 'pointer', fontFamily: font.sans,
+                fontSize: 13, fontWeight: tab === tabKeys[idx] ? 700 : 500, borderRadius: '8px 8px 0 0',
+                color: tab === tabKeys[idx] ? C.navy : 'rgba(255,255,255,0.7)',
+                background: tab === tabKeys[idx] ? C.white : 'rgba(255,255,255,0.1)',
+                transition: 'all 0.2s',
+              }}>{t}</button>
+            ))}
+          </div>
+        </div>
       </div>
 
       {/* ═══ MARKETS TAB ═══ */}
@@ -829,7 +906,7 @@ function InsightsPage({ onNavigate }) {
                 </div>
               </div>
               <div style={{ height: 200 }}>
-                <ComparisonChart data1={overviewLH[0]} data2={overviewLH[1]} label1="Longhorn Blended" label2="Market Benchmark" color1={C.red} color2={C.gray300} />
+                <ComparisonChart data1={overviewLH[0]} data2={overviewLH[1]} label1="Longhorn Blended" label2="Market Benchmark" color1={C.red}  />
               </div>
             </div>
 
@@ -848,8 +925,6 @@ function InsightsPage({ onNavigate }) {
               ))}
             </div>
           </div>
-
-          <MarketTicker />
         </div>
       )}
 
@@ -883,7 +958,7 @@ function InsightsPage({ onNavigate }) {
                       </div>
                       {/* Chart */}
                       <div style={{ height: 130, marginBottom: 12 }}>
-                        <ComparisonChart data1={d1} data2={d2} label1={comp.fund} label2={comp.instrument} color1={C.red} color2={C.gray300} width={300} height={120} />
+                        <ComparisonChart data1={d1} data2={d2} label1={comp.fund} label2={comp.instrument} color1={C.red}  width={300} height={120} />
                       </div>
                       {/* Returns row */}
                       <div style={{ display: 'flex', gap: 8 }}>
@@ -902,8 +977,6 @@ function InsightsPage({ onNavigate }) {
               </div>
             </div>
           ))}
-
-          <MarketTicker />
         </div>
       )}
 
@@ -911,27 +984,35 @@ function InsightsPage({ onNavigate }) {
       {tab === 'news' && (
         <div style={{ flex: 1, padding: '28px 60px', background: C.offWhite }}>
           <h3 style={{ fontFamily: font.serif, fontSize: 20, fontWeight: 700, color: C.gray900, marginBottom: 20 }}>Latest News & Events</h3>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 20 }}>
-            {newsItems.map(item => (
-              <div key={item.title} style={{
-                background: C.white, borderRadius: 12, overflow: 'hidden',
-                border: `1px solid ${C.gray100}`, transition: 'all 0.25s', cursor: 'pointer',
-              }}
-                onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-3px)'; e.currentTarget.style.boxShadow = '0 8px 24px rgba(0,0,0,0.08)'; }}
-                onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = 'none'; }}
-              >
-                <div style={{ height: 120, background: `linear-gradient(135deg, ${C.navy}, ${C.navyLight})`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <Newspaper size={28} style={{ color: 'rgba(255,255,255,0.3)' }} />
+          <NewsCarousel items={newsItems} onSelect={setSelectedNews} />
+          {/* News detail modal */}
+          {selectedNews && (
+            <div onClick={() => setSelectedNews(null)} style={{
+              position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)',
+              zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24,
+            }}>
+              <div onClick={e => e.stopPropagation()} style={{
+                background: '#fff', borderRadius: 20, maxWidth: 560, width: '100%',
+                overflow: 'hidden', boxShadow: '0 24px 64px rgba(0,0,0,0.2)', position: 'relative',
+              }}>
+                <button onClick={() => setSelectedNews(null)} style={{
+                  position: 'absolute', top: 16, right: 16, width: 36, height: 36, borderRadius: '50%',
+                  background: 'rgba(255,255,255,0.9)', border: 'none', cursor: 'pointer',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10,
+                }}><X size={18} style={{ color: '#374151' }} /></button>
+                <div style={{ height: 140, background: `linear-gradient(135deg, ${C.navy}, ${C.navyLight})`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <Newspaper size={40} style={{ color: 'rgba(255,255,255,0.3)' }} />
                 </div>
-                <div style={{ padding: 18 }}>
-                  <span style={{ fontSize: 10, fontWeight: 700, color: C.red, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{item.cat}</span>
-                  <h3 style={{ fontFamily: font.serif, fontSize: 15, fontWeight: 700, color: C.gray900, marginTop: 6, marginBottom: 8, lineHeight: 1.3 }}>{item.title}</h3>
-                  <p style={{ fontSize: 12, color: C.gray500, lineHeight: 1.5 }}>{item.excerpt}</p>
-                  <div style={{ fontSize: 11, color: C.gray400, marginTop: 10 }}>{item.date}</div>
+                <div style={{ padding: '28px 32px' }}>
+                  <span style={{ fontSize: 11, fontWeight: 700, color: C.red, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{selectedNews.cat}</span>
+                  <h2 style={{ fontFamily: font.serif, fontSize: 22, fontWeight: 700, color: C.gray900, marginTop: 8, marginBottom: 12, lineHeight: 1.3 }}>{selectedNews.title}</h2>
+                  <div style={{ fontSize: 12, color: C.gray400, marginBottom: 16 }}>{selectedNews.date}</div>
+                  <div style={{ width: 32, height: 3, borderRadius: 2, background: C.red, marginBottom: 16 }} />
+                  <p style={{ fontSize: 15, color: C.gray600, lineHeight: 1.8 }}>{selectedNews.excerpt}</p>
                 </div>
               </div>
-            ))}
-          </div>
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -1038,30 +1119,206 @@ function TeamModal({ member, accentColor, onClose }) {
 }
 
 /* ═══════════════════════════════════════════ */
+/*  TEAM CAROUSEL                              */
+/* ═══════════════════════════════════════════ */
+function TeamCarousel({ members, accentColor, onSelect }) {
+  const [current, setCurrent] = useState(0);
+  const timerRef = useRef(null);
+
+  const startTimer = useCallback(() => {
+    clearInterval(timerRef.current);
+    timerRef.current = setInterval(() => {
+      setCurrent(prev => (prev + 1) % members.length);
+    }, 5000);
+  }, [members.length]);
+
+  useEffect(() => { startTimer(); return () => clearInterval(timerRef.current); }, [startTimer]);
+
+  const goTo = (idx) => { setCurrent(idx); startTimer(); };
+  const prev = () => goTo((current - 1 + members.length) % members.length);
+  const next = () => goTo((current + 1) % members.length);
+
+  /* Show 3 cards at a time */
+  const visible = [0, 1, 2].map(offset => members[(current + offset) % members.length]);
+
+  return (
+    <div style={{ position: 'relative' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 22 }}>
+        {visible.map((m, i) => (
+          <div key={`${m.name}-${m.role}-${i}`} style={{ animation: 'teamFadeIn 0.5s ease both', animationDelay: `${i * 0.1}s` }}>
+            <TeamCard member={m} accentColor={accentColor} onSelect={onSelect} />
+          </div>
+        ))}
+      </div>
+
+      {/* Navigation arrows */}
+      <button onClick={prev} style={{
+        position: 'absolute', left: -22, top: '40%', transform: 'translateY(-50%)',
+        width: 44, height: 44, borderRadius: '50%', background: C.white,
+        boxShadow: '0 4px 16px rgba(0,0,0,0.12)', border: `1px solid ${C.gray100}`,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        cursor: 'pointer', color: C.gray600, zIndex: 5, transition: 'all 0.2s',
+      }}
+        onMouseEnter={e => { e.currentTarget.style.background = accentColor; e.currentTarget.style.color = '#fff'; }}
+        onMouseLeave={e => { e.currentTarget.style.background = C.white; e.currentTarget.style.color = C.gray600; }}
+      ><ChevronLeft size={20} /></button>
+
+      <button onClick={next} style={{
+        position: 'absolute', right: -22, top: '40%', transform: 'translateY(-50%)',
+        width: 44, height: 44, borderRadius: '50%', background: C.white,
+        boxShadow: '0 4px 16px rgba(0,0,0,0.12)', border: `1px solid ${C.gray100}`,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        cursor: 'pointer', color: C.gray600, zIndex: 5, transition: 'all 0.2s',
+      }}
+        onMouseEnter={e => { e.currentTarget.style.background = accentColor; e.currentTarget.style.color = '#fff'; }}
+        onMouseLeave={e => { e.currentTarget.style.background = C.white; e.currentTarget.style.color = C.gray600; }}
+      ><ChevronRight size={20} /></button>
+
+      {/* Dot indicators */}
+      <div style={{ display: 'flex', justifyContent: 'center', gap: 6, marginTop: 24 }}>
+        {members.map((_, i) => (
+          <button key={i} onClick={() => goTo(i)} style={{
+            width: current === i ? 24 : 8, height: 8,
+            borderRadius: current === i ? 4 : 50,
+            border: 'none', cursor: 'pointer', padding: 0,
+            background: current === i ? accentColor : C.gray200,
+            transition: 'all 0.3s ease',
+          }} />
+        ))}
+      </div>
+
+      <style>{`
+        @keyframes teamFadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes teamProgress { from { width: 0%; } to { width: 100%; } }
+      `}</style>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════ */
+/*  NEWS CAROUSEL                              */
+/* ═══════════════════════════════════════════ */
+function NewsCarousel({ items, onSelect }) {
+  const [current, setCurrent] = useState(0);
+  const timerRef = useRef(null);
+
+  const startTimer = useCallback(() => {
+    clearInterval(timerRef.current);
+    timerRef.current = setInterval(() => {
+      setCurrent(prev => (prev + 1) % items.length);
+    }, 5000);
+  }, [items.length]);
+
+  useEffect(() => { startTimer(); return () => clearInterval(timerRef.current); }, [startTimer]);
+
+  const goTo = (idx) => { setCurrent(idx); startTimer(); };
+  const prev = () => goTo((current - 1 + items.length) % items.length);
+  const next = () => goTo((current + 1) % items.length);
+
+  /* Show 3 cards at a time */
+  const visible = [0, 1, 2].map(offset => ({
+    item: items[(current + offset) % items.length],
+    idx: (current + offset) % items.length,
+  }));
+
+  return (
+    <div style={{ position: 'relative' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 20 }}>
+        {visible.map(({ item, idx }, i) => (
+          <div key={`${item.title}-${idx}-${i}`} onClick={() => onSelect && onSelect(item)} style={{
+            background: C.white, borderRadius: 12, overflow: 'hidden',
+            border: `1px solid ${C.gray100}`, transition: 'all 0.25s', cursor: 'pointer',
+            animation: 'teamFadeIn 0.5s ease both', animationDelay: `${i * 0.1}s`,
+          }}
+            onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-3px)'; e.currentTarget.style.boxShadow = '0 8px 24px rgba(0,0,0,0.08)'; }}
+            onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = 'none'; }}
+          >
+            <div style={{ height: 120, background: `linear-gradient(135deg, ${C.navy}, ${C.navyLight})`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <Newspaper size={28} style={{ color: 'rgba(255,255,255,0.3)' }} />
+            </div>
+            <div style={{ padding: 18 }}>
+              <span style={{ fontSize: 10, fontWeight: 700, color: C.red, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{item.cat}</span>
+              <h3 style={{ fontFamily: font.serif, fontSize: 15, fontWeight: 700, color: C.gray900, marginTop: 6, marginBottom: 8, lineHeight: 1.3 }}>{item.title}</h3>
+              <p style={{ fontSize: 12, color: C.gray500, lineHeight: 1.5 }}>{item.excerpt}</p>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 10 }}>
+                <span style={{ fontSize: 11, color: C.gray400 }}>{item.date}</span>
+                <span style={{ fontSize: 11, color: C.red, fontWeight: 600 }}>Read More →</span>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Navigation arrows */}
+      <button onClick={prev} style={{
+        position: 'absolute', left: -22, top: '40%', transform: 'translateY(-50%)',
+        width: 44, height: 44, borderRadius: '50%', background: C.white,
+        boxShadow: '0 4px 16px rgba(0,0,0,0.12)', border: `1px solid ${C.gray100}`,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        cursor: 'pointer', color: C.gray600, zIndex: 5, transition: 'all 0.2s',
+      }}
+        onMouseEnter={e => { e.currentTarget.style.background = C.navy; e.currentTarget.style.color = '#fff'; }}
+        onMouseLeave={e => { e.currentTarget.style.background = C.white; e.currentTarget.style.color = C.gray600; }}
+      ><ChevronLeft size={20} /></button>
+
+      <button onClick={next} style={{
+        position: 'absolute', right: -22, top: '40%', transform: 'translateY(-50%)',
+        width: 44, height: 44, borderRadius: '50%', background: C.white,
+        boxShadow: '0 4px 16px rgba(0,0,0,0.12)', border: `1px solid ${C.gray100}`,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        cursor: 'pointer', color: C.gray600, zIndex: 5, transition: 'all 0.2s',
+      }}
+        onMouseEnter={e => { e.currentTarget.style.background = C.navy; e.currentTarget.style.color = '#fff'; }}
+        onMouseLeave={e => { e.currentTarget.style.background = C.white; e.currentTarget.style.color = C.gray600; }}
+      ><ChevronRight size={20} /></button>
+
+      {/* Dot indicators */}
+      <div style={{ display: 'flex', justifyContent: 'center', gap: 6, marginTop: 24 }}>
+        {items.map((_, i) => (
+          <button key={i} onClick={() => goTo(i)} style={{
+            width: current === i ? 24 : 8, height: 8,
+            borderRadius: current === i ? 4 : 50,
+            border: 'none', cursor: 'pointer', padding: 0,
+            background: current === i ? C.red : C.gray200,
+            transition: 'all 0.3s ease',
+          }} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════ */
 /*  ABOUT PAGE                                */
 /* ═══════════════════════════════════════════ */
-function AboutPage() {
-  const [tab, setTab] = useState('about');
+function AboutPage({ initialTab }) {
+  const [tab, setTab] = useState(initialTab || 'about');
   const [teamTab, setTeamTab] = useState('board');
   const [selectedMember, setSelectedMember] = useState(null);
   const tabs = [{ k: 'about', l: 'About Us' }, { k: 'governance', l: 'Governance' }, { k: 'team', l: 'Our Team' }, { k: 'values', l: 'Core Values' }];
 
+  useEffect(() => { if (initialTab) setTab(initialTab); }, [initialTab]);
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', minHeight: 'calc(100vh - 64px)' }}>
       <div style={{ background: `linear-gradient(135deg, ${C.navyDark} 0%, ${C.navy} 100%)`, padding: '32px 60px' }}>
-        <h1 style={{ fontFamily: font.serif, fontSize: 30, fontWeight: 700, color: C.white }}>About Longhorn Associates</h1>
-        <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.5)', marginTop: 6 }}>SEC & PIA Licensed Investment Management Company</p>
-      </div>
-      <div style={{ display: 'flex', background: C.white, padding: '0 60px', borderBottom: `1px solid ${C.gray100}` }}>
-        {tabs.map(t => (
-          <button key={t.k} onClick={() => setTab(t.k)} style={{
-            padding: '14px 24px', border: 'none', cursor: 'pointer', fontFamily: font.sans,
-            fontSize: 14, fontWeight: tab === t.k ? 700 : 500,
-            color: tab === t.k ? C.navy : C.gray400,
-            borderBottom: tab === t.k ? `3px solid ${C.red}` : '3px solid transparent',
-            background: 'transparent',
-          }}>{t.l}</button>
-        ))}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
+          <div>
+            <h1 style={{ fontFamily: font.serif, fontSize: 30, fontWeight: 700, color: C.white }}>About Longhorn Associates</h1>
+            <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.5)', marginTop: 6 }}>SEC & PIA Licensed Investment Management Company</p>
+          </div>
+          <div style={{ display: 'flex', gap: 4 }}>
+            {tabs.map(t => (
+              <button key={t.k} onClick={() => setTab(t.k)} style={{
+                padding: '8px 18px', border: 'none', cursor: 'pointer', fontFamily: font.sans,
+                fontSize: 13, fontWeight: tab === t.k ? 700 : 500, borderRadius: '8px 8px 0 0',
+                color: tab === t.k ? C.navy : 'rgba(255,255,255,0.7)',
+                background: tab === t.k ? C.white : 'rgba(255,255,255,0.1)',
+                transition: 'all 0.2s',
+              }}>{t.l}</button>
+            ))}
+          </div>
+        </div>
       </div>
 
       <div style={{ flex: 1, padding: '32px 60px', background: C.offWhite }}>
@@ -1117,20 +1374,12 @@ function AboutPage() {
 
             {/* Board of Directors */}
             {teamTab === 'board' && (
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 22 }}>
-                {boardOfDirectors.map(m => (
-                  <TeamCard key={m.name} member={m} accentColor={C.red} onSelect={setSelectedMember} />
-                ))}
-              </div>
+              <TeamCarousel members={boardOfDirectors} accentColor={C.red} onSelect={setSelectedMember} />
             )}
 
             {/* Management */}
             {teamTab === 'mgmt' && (
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 22 }}>
-                {managementTeam.map(m => (
-                  <TeamCard key={m.name + m.role} member={m} accentColor={C.navyLight} onSelect={setSelectedMember} />
-                ))}
-              </div>
+              <TeamCarousel members={managementTeam} accentColor={C.navyLight} onSelect={setSelectedMember} />
             )}
 
             {/* Bio Modal */}
@@ -1299,14 +1548,24 @@ function PortalPage() {
           </div>
 
           {tab === 'login' ? (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-              {[{ l: 'Email Address', t: 'email', p: 'your@email.com' }, { l: 'Password', t: 'password', p: '••••••••' }].map(({ l, t, p }) => (
-                <div key={l}><label style={lS}>{l}</label><input type={t} placeholder={p} style={iS} onFocus={fH} onBlur={bH} /></div>
-              ))}
-              <div style={{ textAlign: 'right', marginTop: -6 }}><a href="#" style={{ fontSize: 12, color: C.red, fontWeight: 600 }}>Forgot password?</a></div>
-              <button style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, width: '100%', padding: '14px 0', background: C.red, color: C.white, fontWeight: 700, fontSize: 14, borderRadius: 8, border: 'none', cursor: 'pointer', fontFamily: font.sans }}>
-                <LogIn size={16} /> Sign In
-              </button>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16, textAlign: 'center', padding: '20px 0' }}>
+              <div style={{ width: 64, height: 64, borderRadius: '50%', background: `${C.navy}12`, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto' }}>
+                <LogIn size={28} style={{ color: C.navy }} />
+              </div>
+              <h3 style={{ fontFamily: font.serif, fontSize: 20, fontWeight: 700, color: C.gray900 }}>Sign In to Your Account</h3>
+              <p style={{ fontSize: 14, color: C.gray500, lineHeight: 1.6 }}>Access your SIMP Invest portal to manage your investments, track performance, and view your portfolio.</p>
+              <a href="https://online.longhorn-associates.com/auth/login" target="_blank" rel="noopener noreferrer" style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                width: '100%', padding: '14px 0', background: C.red, color: C.white,
+                fontWeight: 700, fontSize: 14, borderRadius: 8, textDecoration: 'none',
+                fontFamily: font.sans, transition: 'all 0.2s',
+              }}
+                onMouseEnter={e => e.currentTarget.style.background = C.redHover}
+                onMouseLeave={e => e.currentTarget.style.background = C.red}
+              >
+                <LogIn size={16} /> Sign In to SIMP Invest
+              </a>
+              <p style={{ fontSize: 12, color: C.gray400 }}>You will be redirected to the secure login portal</p>
             </div>
           ) : (
             <>
@@ -1370,6 +1629,7 @@ function PortalPage() {
 function ToolsPage({ onNavigate }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', minHeight: 'calc(100vh - 64px)' }}>
+      <MarketTicker />
       <div style={{
         background: `linear-gradient(135deg, ${C.navyDark} 0%, ${C.navy} 100%)`,
         padding: '32px 60px', position: 'relative', overflow: 'hidden',
@@ -1378,13 +1638,12 @@ function ToolsPage({ onNavigate }) {
           backgroundImage: `repeating-linear-gradient(90deg, transparent, transparent 60px, rgba(255,255,255,0.03) 60px, rgba(255,255,255,0.03) 61px)`,
           pointerEvents: 'none'
         }} />
-        <h1 style={{ fontFamily: font.serif, fontSize: 30, fontWeight: 700, color: C.white, position: 'relative' }}>Return Projection Calculator</h1>
+        <h1 style={{ fontFamily: font.serif, fontSize: 30, fontWeight: 700, color: C.white, position: 'relative' }}>ROI Calculator</h1>
         <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.5)', marginTop: 6, position: 'relative' }}>Project your investment growth across our 7 Unit Trust funds</p>
       </div>
       <div style={{ flex: 1, padding: '32px 60px', background: C.offWhite }}>
-        <ReturnCalculator fund={funds[3]} />
+        <ReturnCalculator fund={funds[3]} onNavigate={onNavigate} />
       </div>
-      <MarketTicker />
     </div>
   );
 }
@@ -1419,9 +1678,98 @@ const servicesList = [
     features: ['Comprehensive risk assessment', 'Portfolio stress testing', 'Currency and market risk mitigation', 'Regulatory compliance oversight', 'Ongoing risk monitoring', 'Custom risk reporting'] },
 ];
 
-function ServicesPage({ onNavigate }) {
+function ServicesPage({ onNavigate, serviceId }) {
+  const [detailId, setDetailId] = useState(null);
+  const detail = servicesList.find(s => s.id === detailId);
+
+  useEffect(() => {
+    if (serviceId) {
+      setTimeout(() => {
+        const el = document.getElementById(`svc-${serviceId}`);
+        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 200);
+    }
+  }, [serviceId]);
+
+  /* ── Service Detail View ── */
+  if (detail) {
+    const Icon = detail.icon;
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', minHeight: 'calc(100vh - 64px)' }}>
+        <MarketTicker />
+        <div style={{ background: `linear-gradient(135deg, ${C.navyDark} 0%, ${C.navy} 100%)`, padding: '32px 60px' }}>
+          <button onClick={() => setDetailId(null)} style={{
+            display: 'inline-flex', alignItems: 'center', gap: 6, padding: '6px 14px', borderRadius: 6,
+            background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.2)',
+            color: '#fff', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: font.sans, marginBottom: 16,
+          }}>
+            <ChevronLeft size={14} /> Back to Services
+          </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+            <div style={{ width: 56, height: 56, borderRadius: 16, background: `${detail.color}25`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <Icon size={28} style={{ color: '#fff' }} />
+            </div>
+            <div>
+              <h1 style={{ fontFamily: font.serif, fontSize: 28, fontWeight: 700, color: C.white }}>{detail.label}</h1>
+              <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.6)', marginTop: 4 }}>{detail.tagline}</p>
+            </div>
+          </div>
+        </div>
+        <div style={{ flex: 1, padding: '40px 60px', background: C.offWhite }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1.6fr 1fr', gap: 32 }}>
+            <div>
+              <img src={detail.image} alt={detail.label} style={{ width: '100%', height: 280, objectFit: 'cover', borderRadius: 16, marginBottom: 28 }} />
+              <h2 style={{ fontFamily: font.serif, fontSize: 22, fontWeight: 700, color: C.gray900, marginBottom: 16 }}>About This Service</h2>
+              <p style={{ fontSize: 15, color: C.gray600, lineHeight: 1.8, marginBottom: 24 }}>{detail.desc}</p>
+              <h3 style={{ fontSize: 16, fontWeight: 700, color: C.gray900, marginBottom: 14 }}>Key Features</h3>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 32 }}>
+                {detail.features.map(f => (
+                  <div key={f} style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+                    <CheckCircle size={14} style={{ color: detail.color, marginTop: 3, flexShrink: 0 }} />
+                    <span style={{ fontSize: 14, color: C.gray600, lineHeight: 1.5 }}>{f}</span>
+                  </div>
+                ))}
+              </div>
+              <button onClick={() => onNavigate('contact')} style={{
+                display: 'inline-flex', alignItems: 'center', gap: 8, padding: '14px 28px',
+                background: detail.color, color: C.white, fontWeight: 700, fontSize: 14,
+                borderRadius: 8, border: 'none', cursor: 'pointer', fontFamily: font.sans,
+              }}>Enquire Now <ArrowRight size={14} /></button>
+            </div>
+            <div>
+              <div style={{ padding: 24, borderRadius: 16, background: C.white, border: `1px solid ${C.gray100}`, marginBottom: 20 }}>
+                <h3 style={{ fontSize: 16, fontWeight: 700, color: C.gray900, marginBottom: 16 }}>How It Works</h3>
+                {[
+                  { step: 1, text: 'Contact our team for a personalised consultation' },
+                  { step: 2, text: 'Receive a tailored proposal and strategy' },
+                  { step: 3, text: 'Complete onboarding documentation' },
+                  { step: 4, text: 'Begin your investment journey with expert support' },
+                ].map(({ step, text }) => (
+                  <div key={step} style={{ display: 'flex', gap: 12, marginBottom: 14 }}>
+                    <div style={{ width: 32, height: 32, borderRadius: 8, background: `${detail.color}15`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: font.serif, fontWeight: 700, fontSize: 14, color: detail.color, flexShrink: 0 }}>{step}</div>
+                    <p style={{ fontSize: 13, color: C.gray600, lineHeight: 1.6, marginTop: 6 }}>{text}</p>
+                  </div>
+                ))}
+              </div>
+              <div style={{ padding: 24, borderRadius: 16, background: `linear-gradient(135deg, ${C.navy}, ${C.navyDark})`, color: C.white }}>
+                <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 8 }}>Need Help Choosing?</h3>
+                <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.7)', lineHeight: 1.6, marginBottom: 16 }}>Our advisors can help you find the right service for your goals.</p>
+                <button onClick={() => onNavigate('contact')} style={{
+                  display: 'inline-flex', alignItems: 'center', gap: 6, padding: '10px 20px',
+                  background: C.red, color: C.white, fontWeight: 700, fontSize: 13,
+                  borderRadius: 6, border: 'none', cursor: 'pointer', fontFamily: font.sans,
+                }}>Talk to an Advisor <ArrowRight size={14} /></button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', minHeight: 'calc(100vh - 64px)' }}>
+      <MarketTicker />
       {/* Header */}
       <div style={{
         background: `linear-gradient(135deg, ${C.navyDark} 0%, ${C.navy} 100%)`,
@@ -1503,7 +1851,7 @@ function ServicesPage({ onNavigate }) {
                     </div>
                   ))}
                 </div>
-                <button onClick={() => onNavigate('contact')} style={{
+                <button onClick={() => setDetailId(id)} style={{
                   display: 'inline-flex', alignItems: 'center', gap: 8, padding: '12px 24px',
                   background: color, color: C.white, fontWeight: 700, fontSize: 13,
                   borderRadius: 6, border: 'none', cursor: 'pointer', fontFamily: font.sans,
@@ -1511,7 +1859,7 @@ function ServicesPage({ onNavigate }) {
                 }}
                   onMouseEnter={e => e.currentTarget.style.opacity = '0.85'}
                   onMouseLeave={e => e.currentTarget.style.opacity = '1'}
-                >Enquire Now <ArrowRight size={14} /></button>
+                >Read More <ArrowRight size={14} /></button>
               </div>
 
               {/* Image panel — right on odd */}
@@ -1548,8 +1896,103 @@ function ServicesPage({ onNavigate }) {
           >Book a Free Consultation <ArrowRight size={14} /></button>
         </div>
       </div>
+    </div>
+  );
+}
 
+/* ═══════════════════════════════════════════ */
+/*  CAREERS PAGE                               */
+/* ═══════════════════════════════════════════ */
+const jobListings = [
+  { title: 'Investment Analyst', dept: 'Investments', location: 'Lusaka', type: 'Full-time', desc: 'Join our investment team to research and analyse market opportunities across equity, fixed income, and alternative asset classes. CFA or ACCA qualification preferred.' },
+  { title: 'Client Relationship Manager', dept: 'Client Services', location: 'Lusaka', type: 'Full-time', desc: 'Build and maintain strong client relationships, manage portfolios, and provide personalised investment guidance to our growing client base.' },
+  { title: 'Branch Manager', dept: 'Operations', location: 'Kitwe', type: 'Full-time', desc: 'Lead our Copperbelt branch operations, drive business development, and ensure excellent service delivery across all product lines.' },
+  { title: 'IT Systems Administrator', dept: 'Technology', location: 'Lusaka', type: 'Full-time', desc: 'Manage and maintain our technology infrastructure including SIMP Invest platform, data analytics tools, and cybersecurity systems.' },
+];
+
+function CareersPage({ onNavigate }) {
+  const [selectedJob, setSelectedJob] = useState(null);
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', minHeight: 'calc(100vh - 64px)' }}>
       <MarketTicker />
+      <div style={{ background: `linear-gradient(135deg, ${C.navyDark} 0%, ${C.navy} 100%)`, padding: '40px 60px' }}>
+        <h1 style={{ fontFamily: font.serif, fontSize: 30, fontWeight: 700, color: C.white }}>Careers at Longhorn</h1>
+        <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.5)', marginTop: 6 }}>Join our team and help build Zambia's financial future</p>
+      </div>
+
+      <div style={{ flex: 1, padding: '32px 60px', background: C.offWhite }}>
+        {/* Intro */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr', gap: 32, marginBottom: 36 }}>
+          <div>
+            <div style={{ width: 40, height: 3, background: C.red, borderRadius: 2, marginBottom: 16 }} />
+            <h2 style={{ fontFamily: font.serif, fontSize: 24, fontWeight: 700, color: C.gray900, marginBottom: 12 }}>Why Work With Us?</h2>
+            <p style={{ fontSize: 15, color: C.gray600, lineHeight: 1.8, marginBottom: 16 }}>At Longhorn Associates, we believe in investing in our people as much as we invest for our clients. We offer a collaborative, growth-oriented environment where your expertise makes a real impact on Zambia's financial landscape.</p>
+            {['Competitive compensation & benefits', 'Professional development & CFA support', 'Collaborative, innovative culture', 'Direct impact on Zambia\'s financial growth'].map(f => (
+              <div key={f} style={{ display: 'flex', gap: 10, alignItems: 'center', marginBottom: 8 }}>
+                <CheckCircle size={14} style={{ color: C.green }} />
+                <span style={{ fontSize: 14, color: C.gray600, fontWeight: 500 }}>{f}</span>
+              </div>
+            ))}
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+            {[{ val: '50+', sub: 'Team Members' }, { val: '4', sub: 'Office Locations' }, { val: '15+', sub: 'Years Growing' }, { val: '100%', sub: 'Zambian Owned' }].map(({ val, sub }) => (
+              <div key={sub} style={{ padding: 20, borderRadius: 14, background: C.white, boxShadow: '0 2px 8px rgba(0,0,0,0.06)', textAlign: 'center' }}>
+                <div style={{ fontFamily: font.serif, fontSize: 24, fontWeight: 800, color: C.navy }}>{val}</div>
+                <div style={{ fontSize: 12, color: C.gray400, marginTop: 4, fontWeight: 600 }}>{sub}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Job Listings */}
+        <h2 style={{ fontFamily: font.serif, fontSize: 22, fontWeight: 700, color: C.gray900, marginBottom: 20 }}>Open Positions</h2>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          {jobListings.map((job, i) => (
+            <div key={i} onClick={() => setSelectedJob(selectedJob === i ? null : i)} style={{
+              background: C.white, borderRadius: 12, border: `1px solid ${selectedJob === i ? C.red : C.gray100}`,
+              overflow: 'hidden', cursor: 'pointer', transition: 'all 0.2s',
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '18px 24px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+                  <div style={{ width: 44, height: 44, borderRadius: 12, background: `${C.red}12`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <Briefcase size={20} style={{ color: C.red }} />
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 16, fontWeight: 700, color: C.gray900 }}>{job.title}</div>
+                    <div style={{ fontSize: 12, color: C.gray500, marginTop: 2 }}>{job.dept} · {job.location} · {job.type}</div>
+                  </div>
+                </div>
+                <ChevronDown size={18} style={{ color: C.gray400, transform: selectedJob === i ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
+              </div>
+              {selectedJob === i && (
+                <div style={{ padding: '0 24px 20px', borderTop: `1px solid ${C.gray100}`, marginTop: -4, paddingTop: 16 }}>
+                  <p style={{ fontSize: 14, color: C.gray600, lineHeight: 1.7, marginBottom: 16 }}>{job.desc}</p>
+                  <button onClick={(e) => { e.stopPropagation(); onNavigate('contact'); }} style={{
+                    display: 'inline-flex', alignItems: 'center', gap: 8, padding: '10px 20px',
+                    background: C.red, color: C.white, fontWeight: 700, fontSize: 13,
+                    borderRadius: 6, border: 'none', cursor: 'pointer', fontFamily: font.sans,
+                  }}>Apply Now <ArrowRight size={14} /></button>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+
+        {/* General application CTA */}
+        <div style={{
+          marginTop: 32, padding: '36px 40px', borderRadius: 16, textAlign: 'center',
+          background: `linear-gradient(135deg, ${C.navy}, ${C.navyDark})`,
+        }}>
+          <h3 style={{ fontFamily: font.serif, fontSize: 22, fontWeight: 700, color: C.white, marginBottom: 10 }}>Don't See Your Role?</h3>
+          <p style={{ color: 'rgba(255,255,255,0.65)', fontSize: 14, marginBottom: 20 }}>Send us your CV and we'll keep you in mind for future opportunities.</p>
+          <button onClick={() => onNavigate('contact')} style={{
+            display: 'inline-flex', alignItems: 'center', gap: 8, padding: '12px 24px',
+            background: C.red, color: C.white, fontWeight: 700, fontSize: 14,
+            borderRadius: 8, border: 'none', cursor: 'pointer', fontFamily: font.sans,
+          }}>Send Your CV <ArrowRight size={14} /></button>
+        </div>
+      </div>
     </div>
   );
 }
@@ -1561,14 +2004,23 @@ export default function App() {
   const [page, setPage] = useState('home');
   const [fundId, setFundId] = useState(null);
   const [dropdown, setDropdown] = useState(null);
+  const [aboutTab, setAboutTab] = useState('about');
+  const [serviceId, setServiceId] = useState(null);
   const scrollRef = useRef(null);
 
   const navigate = useCallback((p, fId, tab) => {
     if (p === 'fund') {
       setPage('fund');
       setFundId(fId || 'fixed-income');
+    } else if (p === 'about') {
+      setPage('about');
+      setAboutTab(tab || 'about');
+    } else if (p === 'products' && fId) {
+      setPage('products');
+      setServiceId(fId);
     } else {
       setPage(p);
+      if (p === 'products') setServiceId(null);
     }
     setDropdown(null);
     if (scrollRef.current) scrollRef.current.scrollTop = 0;
@@ -1576,22 +2028,23 @@ export default function App() {
 
   const navItems = [
     { label: 'About', hasDropdown: true, items: [
-      { label: 'About Us', action: () => navigate('about') },
-      { label: 'Governance', action: () => navigate('about') },
-      { label: 'Our Team', action: () => navigate('about') },
-      { label: 'Core Values', action: () => navigate('about') },
+      { label: 'About Us', action: () => navigate('about', null, 'about') },
+      { label: 'Governance', action: () => navigate('about', null, 'governance') },
+      { label: 'Our Team', action: () => navigate('about', null, 'team') },
+      { label: 'Core Values', action: () => navigate('about', null, 'values') },
     ]},
     { label: 'Products', hasDropdown: true, items: [
-      { label: 'Pension Fund Management', action: () => navigate('products') },
-      { label: 'Unit Trust Fund Management', action: () => navigate('products') },
-      { label: 'Credit', action: () => navigate('products') },
-      { label: 'Securities & Stock Broking', action: () => navigate('products') },
-      { label: 'Consultancy & Advisory', action: () => navigate('products') },
-      { label: 'Risk Management', action: () => navigate('products') },
+      { label: 'Pension Fund Management', action: () => navigate('products', 'pension') },
+      { label: 'Unit Trust Fund Management', action: () => navigate('products', 'unit-trust') },
+      { label: 'Credit', action: () => navigate('products', 'credit') },
+      { label: 'Securities & Stock Broking', action: () => navigate('products', 'securities') },
+      { label: 'Consultancy & Advisory', action: () => navigate('products', 'advisory') },
+      { label: 'Risk Management', action: () => navigate('products', 'risk') },
     ]},
-    { label: 'Governance', action: () => navigate('about') },
+    { label: 'Governance', action: () => navigate('about', null, 'governance') },
     { label: 'Insights', action: () => navigate('insights') },
-    { label: 'Tools', action: () => navigate('tools') },
+    { label: 'ROI Calculator', action: () => navigate('tools') },
+    { label: 'Careers', action: () => navigate('careers') },
   ];
 
   return (
@@ -1605,9 +2058,13 @@ export default function App() {
         display: 'flex', alignItems: 'center', padding: '0 40px', zIndex: 200, position: 'relative',
       }}>
         {/* Logo */}
-        <div onClick={() => navigate('home')} style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 3 }}>
-          <span style={{ fontFamily: font.serif, fontSize: 22, fontWeight: 800, color: C.red }}>Longhorn</span>
-          <span style={{ fontFamily: font.sans, fontSize: 14, fontWeight: 600, color: C.navy, marginTop: 2 }}>Associates</span>
+        <div onClick={() => navigate('home')} style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 10 }}>
+          <img src="/logo.jpeg" alt="Longhorn Associates" style={{ height: 42, width: 'auto', objectFit: 'contain' }}
+            onError={e => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'flex'; }} />
+          <div style={{ display: 'none', alignItems: 'center', gap: 3 }}>
+            <span style={{ fontFamily: font.serif, fontSize: 22, fontWeight: 800, color: C.red }}>Longhorn</span>
+            <span style={{ fontFamily: font.sans, fontSize: 14, fontWeight: 600, color: C.navy, marginTop: 2 }}>Associates</span>
+          </div>
         </div>
 
         {/* Nav links */}
@@ -1662,7 +2119,7 @@ export default function App() {
             onMouseEnter={e => e.currentTarget.style.background = C.redHover}
             onMouseLeave={e => e.currentTarget.style.background = C.red}
           >
-            SIMP Invest <ArrowUpRight size={12} />
+            Signup / Login <ArrowUpRight size={12} />
           </button>
 
           <button style={{ marginLeft: 8, width: 36, height: 36, borderRadius: 8, border: 'none', background: 'transparent', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: C.gray500 }}>
@@ -1675,12 +2132,13 @@ export default function App() {
       <div ref={scrollRef} style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden' }}>
         {page === 'home' && <HomePage onNavigate={navigate} />}
         {page === 'fund' && <FundDetailPage fundId={fundId} onNavigate={navigate} />}
-        {page === 'products' && <ServicesPage onNavigate={navigate} />}
+        {page === 'products' && <ServicesPage onNavigate={navigate} serviceId={serviceId} />}
         {page === 'insights' && <InsightsPage onNavigate={navigate} />}
-        {page === 'about' && <AboutPage />}
+        {page === 'about' && <AboutPage initialTab={aboutTab} />}
         {page === 'contact' && <ContactPage />}
         {page === 'tools' && <ToolsPage onNavigate={navigate} />}
         {page === 'portal' && <PortalPage />}
+        {page === 'careers' && <CareersPage onNavigate={navigate} />}
       </div>
     </div>
   );
