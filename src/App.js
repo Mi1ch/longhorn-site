@@ -6,7 +6,7 @@ import {
   GraduationCap, Briefcase, BookOpen, Globe, Target, Mail, Phone, Clock,
   Lock, FileText, CreditCard, UserCheck, Building2, X, DollarSign, Activity,
   Info, Play, Calculator, Newspaper, Calendar, Heart, Eye, Star, ArrowUpRight,
-  AlertTriangle
+  AlertTriangle, Menu
 } from "lucide-react";
 
 /* ── Stethoscope icon ── */
@@ -27,6 +27,21 @@ const C = {
   gold: '#C9982E', green: '#16A34A',
 };
 const font = { serif: "'Playfair Display',Georgia,serif", sans: "'DM Sans',system-ui,sans-serif" };
+
+/* ═══════════════════════════════════════════ */
+/*  RESPONSIVE HOOK                            */
+/* ═══════════════════════════════════════════ */
+function useIsMobile(breakpoint = 768) {
+  const [isMobile, setIsMobile] = useState(window.innerWidth < breakpoint);
+  useEffect(() => {
+    const handler = () => setIsMobile(window.innerWidth < breakpoint);
+    window.addEventListener('resize', handler);
+    return () => window.removeEventListener('resize', handler);
+  }, [breakpoint]);
+  return isMobile;
+}
+const px = (mobile) => mobile ? '0 20px' : '0 60px';
+const pad = (mobile) => mobile ? '20px 20px' : '32px 60px';
 
 /* ═══════════════════════════════════════════ */
 /*  FUND DATA (from brochure)                 */
@@ -203,6 +218,7 @@ const heroSlides = [
 function HomePage({ onNavigate }) {
   const [currentSlide, setCurrentSlide] = useState(0);
   const timerRef = useRef(null);
+  const isMobile = useIsMobile();
 
   const quickLinks = [
     { icon: Info, label: 'About Longhorn', page: 'about' },
@@ -246,7 +262,7 @@ function HomePage({ onNavigate }) {
           ══════════════════════════════════════════ */}
       <div style={{
         position: 'relative', overflow: 'hidden',
-        height: 320, minHeight: 320, maxHeight: 320,
+        height: isMobile ? 260 : 320, minHeight: isMobile ? 260 : 320, maxHeight: isMobile ? 260 : 320,
         display: 'flex', alignItems: 'center',
         marginTop: 6,
       }}>
@@ -266,12 +282,14 @@ function HomePage({ onNavigate }) {
         {/* Subtle left-side gradient for text readability — no full-image tint */}
         <div style={{
           position: 'absolute', inset: 0,
-          background: 'linear-gradient(90deg, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0.25) 45%, transparent 70%)',
+          background: isMobile
+            ? 'linear-gradient(180deg, rgba(0,0,0,0.5) 0%, rgba(0,0,0,0.3) 100%)'
+            : 'linear-gradient(90deg, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0.25) 45%, transparent 70%)',
           pointerEvents: 'none',
         }} />
 
         {/* Slide content */}
-        <div style={{ position: 'relative', zIndex: 1, padding: '0 60px', maxWidth: 640 }}>
+        <div style={{ position: 'relative', zIndex: 1, padding: isMobile ? '0 20px' : '0 60px', maxWidth: 640 }}>
           {/* Service tag with icon */}
           <div key={`tag-${currentSlide}`} style={{
             display: 'inline-flex', alignItems: 'center', gap: 10,
@@ -378,13 +396,13 @@ function HomePage({ onNavigate }) {
 
       {/* ── Quick Link Icons Row ── */}
       <div style={{
-        display: 'flex', justifyContent: 'center', gap: 0,
-        padding: '28px 60px', background: C.white, borderBottom: `1px solid ${C.gray100}`,
+        display: 'flex', justifyContent: 'center', gap: 0, flexWrap: isMobile ? 'wrap' : 'nowrap',
+        padding: isMobile ? '16px 12px' : '28px 60px', background: C.white, borderBottom: `1px solid ${C.gray100}`,
       }}>
         {quickLinks.map(({ icon: Ic, label, page }) => (
           <button key={label} onClick={() => onNavigate(page)} style={{
-            flex: 1, maxWidth: 150, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10,
-            padding: '16px 12px', border: 'none', background: 'transparent', cursor: 'pointer',
+            flex: isMobile ? '0 0 30%' : 1, maxWidth: isMobile ? 'none' : 150, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: isMobile ? 6 : 10,
+            padding: isMobile ? '10px 8px' : '16px 12px', border: 'none', background: 'transparent', cursor: 'pointer',
             transition: 'all 0.2s', borderRadius: 8,
           }}
             onMouseEnter={e => { e.currentTarget.style.background = C.gray50; }}
@@ -412,6 +430,7 @@ function FundDetailPage({ fundId, onNavigate }) {
   const fund = funds.find(f => f.id === fundId) || funds[1];
   const FIcon = fund.icon;
   const [activeTab, setActiveTab] = useState('performance');
+  const isMobile = useIsMobile();
   const tabs = ['Overview', 'Performance', 'Project Returns', 'Documents', 'How to Invest'];
   const tabKeys = ['overview', 'performance', 'project', 'documents', 'howto'];
   const chartData = genChart(12, 100, parseFloat(fund.returnRate)/100);
@@ -421,19 +440,19 @@ function FundDetailPage({ fundId, onNavigate }) {
       {/* Fund header */}
       <div style={{
         background: `linear-gradient(135deg, ${C.navyDark} 0%, ${C.navy} 100%)`,
-        padding: '28px 60px', display: 'flex', alignItems: 'center', gap: 20,
+        padding: isMobile ? '20px 16px' : '28px 60px', display: 'flex', alignItems: 'center', gap: isMobile ? 12 : 20,
       }}>
-        <div style={{ width: 52, height: 52, borderRadius: 14, background: `${fund.color}30`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <FIcon size={26} style={{ color: fund.color }} />
+        <div style={{ width: isMobile ? 40 : 52, height: isMobile ? 40 : 52, borderRadius: 14, background: `${fund.color}30`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <FIcon size={isMobile ? 20 : 26} style={{ color: fund.color }} />
         </div>
         <div>
-          <h1 style={{ fontFamily: font.serif, fontSize: 28, fontWeight: 700, color: C.white, marginBottom: 4 }}>{fund.name}</h1>
-          <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)' }}>Longhorn Unit Trust · Annual Fee: {fund.fee}</p>
+          <h1 style={{ fontFamily: font.serif, fontSize: isMobile ? 20 : 28, fontWeight: 700, color: C.white, marginBottom: 4 }}>{fund.name}</h1>
+          <p style={{ fontSize: isMobile ? 11 : 13, color: 'rgba(255,255,255,0.6)' }}>Longhorn Unit Trust · Annual Fee: {fund.fee}</p>
         </div>
       </div>
 
       {/* Tabs */}
-      <div style={{ display: 'flex', background: C.navy, padding: '0 60px', gap: 0 }}>
+      <div style={{ display: 'flex', background: C.navy, padding: isMobile ? '0 12px' : '0 60px', gap: 0, overflowX: isMobile ? 'auto' : 'visible' }}>
         {tabs.map((t, i) => (
           <button key={t} onClick={() => setActiveTab(tabKeys[i])} style={{
             padding: '14px 20px', border: 'none', cursor: 'pointer', fontFamily: font.sans,
@@ -447,9 +466,9 @@ function FundDetailPage({ fundId, onNavigate }) {
       </div>
 
       {/* Content */}
-      <div style={{ flex: 1, display: 'flex', background: C.white }}>
+      <div style={{ flex: 1, display: 'flex', flexDirection: isMobile ? 'column' : 'row', background: C.white }}>
         {/* Chart area */}
-        <div style={{ flex: 1, padding: '32px 40px' }}>
+        <div style={{ flex: 1, padding: isMobile ? '20px 16px' : '32px 40px' }}>
           {(activeTab === 'performance' || activeTab === 'overview') && (
             <>
               <div style={{ height: 260, marginBottom: 16, border: `1px solid ${C.gray100}`, borderRadius: 12, padding: 16, background: C.offWhite }}>
@@ -526,7 +545,7 @@ function FundDetailPage({ fundId, onNavigate }) {
         </div>
 
         {/* Stats Sidebar */}
-        <div style={{ width: 260, borderLeft: `1px solid ${C.gray100}`, padding: '32px 24px', background: C.offWhite }}>
+        <div style={{ width: isMobile ? '100%' : 260, borderLeft: isMobile ? 'none' : `1px solid ${C.gray100}`, borderTop: isMobile ? `1px solid ${C.gray100}` : 'none', padding: isMobile ? '20px 16px' : '32px 24px', background: C.offWhite }}>
           {[
             { label: 'Annual Return', value: `${fund.returnRate}%`, color: C.red },
             { label: 'Fund Size', value: fund.fundSize, color: C.gray900 },
@@ -577,6 +596,7 @@ function ReturnCalculator({ fund, onNavigate }) {
   const [horizon, setHorizon] = useState(5);
   const [scenario, setScenario] = useState('historical');
   const [calculated, setCalculated] = useState(false);
+  const isMobile = useIsMobile();
 
   const rates = { historical: parseFloat(fund?.returnRate || 8)/100, conservative: 0.05, balanced: 0.08, optimistic: 0.12 };
   const rate = rates[scenario];
@@ -600,7 +620,7 @@ function ReturnCalculator({ fund, onNavigate }) {
         {fund ? `Fund: ${fund.name}` : 'Estimate your investment growth'}
       </p>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.4fr', gap: 28 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1.4fr', gap: 28 }}>
         {/* Inputs */}
         <div>
           <div style={{ padding: 20, background: C.gray50, borderRadius: 12, border: `1px solid ${C.gray100}` }}>
@@ -848,6 +868,7 @@ const newsItems = [
 function InsightsPage({ onNavigate }) {
   const [tab, setTab] = useState('markets');
   const [selectedNews, setSelectedNews] = useState(null);
+  const isMobile = useIsMobile();
   const tabs = ['Markets', 'Funds', 'News & Events'];
   const tabKeys = ['markets', 'funds', 'news'];
 
@@ -859,11 +880,11 @@ function InsightsPage({ onNavigate }) {
       {/* Ticker above banner */}
       <MarketTicker />
       {/* Header with tabs */}
-      <div style={{ background: `linear-gradient(135deg, ${C.navyDark} 0%, ${C.navy} 100%)`, padding: '32px 60px' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
+      <div style={{ background: `linear-gradient(135deg, ${C.navyDark} 0%, ${C.navy} 100%)`, padding: isMobile ? '24px 20px' : '32px 60px' }}>
+        <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', justifyContent: 'space-between', alignItems: isMobile ? 'flex-start' : 'flex-end', gap: isMobile ? 16 : 0 }}>
           <div>
-            <h1 style={{ fontFamily: font.serif, fontSize: 30, fontWeight: 700, color: C.white, marginBottom: 4 }}>Insights & Market Data</h1>
-            <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.5)' }}>Longhorn fund performance vs market instruments · General market indicators</p>
+            <h1 style={{ fontFamily: font.serif, fontSize: isMobile ? 22 : 30, fontWeight: 700, color: C.white, marginBottom: 4 }}>Insights & Market Data</h1>
+            <p style={{ fontSize: isMobile ? 12 : 14, color: 'rgba(255,255,255,0.5)' }}>Longhorn fund performance vs market instruments</p>
           </div>
           <div style={{ display: 'flex', gap: 4 }}>
             {tabs.map((t, idx) => (
@@ -881,11 +902,11 @@ function InsightsPage({ onNavigate }) {
 
       {/* ═══ MARKETS TAB ═══ */}
       {tab === 'markets' && (
-        <div style={{ flex: 1, padding: '28px 60px', background: C.offWhite }}>
+        <div style={{ flex: 1, padding: isMobile ? '20px 16px' : '28px 60px', background: C.offWhite }}>
           {/* Market Snapshot Cards */}
           <div style={{ marginBottom: 28 }}>
             <h3 style={{ fontFamily: font.serif, fontSize: 18, fontWeight: 700, color: C.gray900, marginBottom: 16 }}>Market Snapshot</h3>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 12 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(6, 1fr)', gap: 12 }}>
               {marketSnapshot.map(({ label, value, change, negative }) => (
                 <div key={label} style={{ padding: '16px 14px', borderRadius: 12, background: C.white, border: `1px solid ${C.gray100}` }}>
                   <div style={{ fontSize: 11, color: C.gray400, fontWeight: 600, marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{label}</div>
@@ -897,7 +918,7 @@ function InsightsPage({ onNavigate }) {
           </div>
 
           {/* Overall Performance Comparison */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 280px', gap: 20, marginBottom: 28 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 280px', gap: 20, marginBottom: 28 }}>
             <div style={{ padding: 20, borderRadius: 14, background: C.white, border: `1px solid ${C.gray100}` }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
                 <div>
@@ -930,7 +951,7 @@ function InsightsPage({ onNavigate }) {
 
       {/* ═══ FUNDS TAB ═══ */}
       {tab === 'funds' && (
-        <div style={{ flex: 1, padding: '28px 60px', background: C.offWhite }}>
+        <div style={{ flex: 1, padding: isMobile ? '20px 16px' : '28px 60px', background: C.offWhite }}>
           {[
             { key: 'short', label: 'Short Term (0–1 Year)', color: C.navyLight, items: fundComparisons.short },
             { key: 'medium', label: 'Medium Term (1–5 Years)', color: C.navy, items: fundComparisons.medium },
@@ -942,7 +963,7 @@ function InsightsPage({ onNavigate }) {
                 <h3 style={{ fontFamily: font.serif, fontSize: 18, fontWeight: 700, color: C.gray900 }}>{label}</h3>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: items.length === 2 ? '1fr 1fr' : 'repeat(3, 1fr)', gap: 16 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : (items.length === 2 ? '1fr 1fr' : 'repeat(3, 1fr)'), gap: 16 }}>
                 {items.map((comp) => {
                   const [d1, d2] = genPair(12, comp.lhGrowth, comp.mktGrowth);
                   const diff = (parseFloat(comp.lhReturn) - parseFloat(comp.mktReturn)).toFixed(1);
@@ -982,7 +1003,7 @@ function InsightsPage({ onNavigate }) {
 
       {/* ═══ NEWS & EVENTS TAB ═══ */}
       {tab === 'news' && (
-        <div style={{ flex: 1, padding: '28px 60px', background: C.offWhite }}>
+        <div style={{ flex: 1, padding: isMobile ? '20px 16px' : '28px 60px', background: C.offWhite }}>
           <h3 style={{ fontFamily: font.serif, fontSize: 20, fontWeight: 700, color: C.gray900, marginBottom: 20 }}>Latest News & Events</h3>
           <NewsCarousel items={newsItems} onSelect={setSelectedNews} />
           {/* News detail modal */}
@@ -1078,10 +1099,11 @@ function TeamCard({ member, accentColor, onSelect }) {
 function TeamModal({ member, accentColor, onClose }) {
   const [imgError, setImgError] = useState(false);
   const hasPhoto = member.photo && !imgError;
+  const isMobile = useIsMobile();
   return (
     <div onClick={onClose} style={{
       position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)',
-      zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24,
+      zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: isMobile ? 12 : 24,
     }}>
       <div onClick={e => e.stopPropagation()} style={{
         background: '#fff', borderRadius: 20, maxWidth: 640, width: '100%',
@@ -1092,12 +1114,12 @@ function TeamModal({ member, accentColor, onClose }) {
           background: '#f3f4f6', border: 'none', cursor: 'pointer',
           display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10,
         }}><X size={18} style={{ color: '#374151' }} /></button>
-        <div style={{ display: 'flex' }}>
+        <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row' }}>
           <div style={{
-            width: 220, minHeight: 280, flexShrink: 0,
+            width: isMobile ? '100%' : 220, minHeight: isMobile ? 200 : 280, flexShrink: 0,
             background: hasPhoto ? 'none' : `linear-gradient(135deg, ${accentColor}, ${accentColor}cc)`,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            borderRadius: '20px 0 0 20px', overflow: 'hidden',
+            borderRadius: isMobile ? '20px 20px 0 0' : '20px 0 0 20px', overflow: 'hidden',
           }}>
             {hasPhoto ? (
               <img src={member.photo} alt={member.name} onError={() => setImgError(true)}
@@ -1124,6 +1146,8 @@ function TeamModal({ member, accentColor, onClose }) {
 function TeamCarousel({ members, accentColor, onSelect }) {
   const [current, setCurrent] = useState(0);
   const timerRef = useRef(null);
+  const isMobile = useIsMobile();
+  const perPage = isMobile ? 1 : 3;
 
   const startTimer = useCallback(() => {
     clearInterval(timerRef.current);
@@ -1138,12 +1162,11 @@ function TeamCarousel({ members, accentColor, onSelect }) {
   const prev = () => goTo((current - 1 + members.length) % members.length);
   const next = () => goTo((current + 1) % members.length);
 
-  /* Show 3 cards at a time */
-  const visible = [0, 1, 2].map(offset => members[(current + offset) % members.length]);
+  const visible = Array.from({ length: perPage }, (_, offset) => members[(current + offset) % members.length]);
 
   return (
     <div style={{ position: 'relative' }}>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 22 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: `repeat(${perPage}, 1fr)`, gap: isMobile ? 12 : 22 }}>
         {visible.map((m, i) => (
           <div key={`${m.name}-${m.role}-${i}`} style={{ animation: 'teamFadeIn 0.5s ease both', animationDelay: `${i * 0.1}s` }}>
             <TeamCard member={m} accentColor={accentColor} onSelect={onSelect} />
@@ -1153,8 +1176,8 @@ function TeamCarousel({ members, accentColor, onSelect }) {
 
       {/* Navigation arrows */}
       <button onClick={prev} style={{
-        position: 'absolute', left: -22, top: '40%', transform: 'translateY(-50%)',
-        width: 44, height: 44, borderRadius: '50%', background: C.white,
+        position: 'absolute', left: isMobile ? -8 : -22, top: '40%', transform: 'translateY(-50%)',
+        width: isMobile ? 36 : 44, height: isMobile ? 36 : 44, borderRadius: '50%', background: C.white,
         boxShadow: '0 4px 16px rgba(0,0,0,0.12)', border: `1px solid ${C.gray100}`,
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         cursor: 'pointer', color: C.gray600, zIndex: 5, transition: 'all 0.2s',
@@ -1164,8 +1187,8 @@ function TeamCarousel({ members, accentColor, onSelect }) {
       ><ChevronLeft size={20} /></button>
 
       <button onClick={next} style={{
-        position: 'absolute', right: -22, top: '40%', transform: 'translateY(-50%)',
-        width: 44, height: 44, borderRadius: '50%', background: C.white,
+        position: 'absolute', right: isMobile ? -8 : -22, top: '40%', transform: 'translateY(-50%)',
+        width: isMobile ? 36 : 44, height: isMobile ? 36 : 44, borderRadius: '50%', background: C.white,
         boxShadow: '0 4px 16px rgba(0,0,0,0.12)', border: `1px solid ${C.gray100}`,
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         cursor: 'pointer', color: C.gray600, zIndex: 5, transition: 'all 0.2s',
@@ -1201,6 +1224,8 @@ function TeamCarousel({ members, accentColor, onSelect }) {
 function NewsCarousel({ items, onSelect }) {
   const [current, setCurrent] = useState(0);
   const timerRef = useRef(null);
+  const isMobile = useIsMobile();
+  const perPage = isMobile ? 1 : 3;
 
   const startTimer = useCallback(() => {
     clearInterval(timerRef.current);
@@ -1215,15 +1240,14 @@ function NewsCarousel({ items, onSelect }) {
   const prev = () => goTo((current - 1 + items.length) % items.length);
   const next = () => goTo((current + 1) % items.length);
 
-  /* Show 3 cards at a time */
-  const visible = [0, 1, 2].map(offset => ({
+  const visible = Array.from({ length: perPage }, (_, offset) => ({
     item: items[(current + offset) % items.length],
     idx: (current + offset) % items.length,
   }));
 
   return (
     <div style={{ position: 'relative' }}>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 20 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: `repeat(${perPage}, 1fr)`, gap: isMobile ? 12 : 20 }}>
         {visible.map(({ item, idx }, i) => (
           <div key={`${item.title}-${idx}-${i}`} onClick={() => onSelect && onSelect(item)} style={{
             background: C.white, borderRadius: 12, overflow: 'hidden',
@@ -1251,8 +1275,8 @@ function NewsCarousel({ items, onSelect }) {
 
       {/* Navigation arrows */}
       <button onClick={prev} style={{
-        position: 'absolute', left: -22, top: '40%', transform: 'translateY(-50%)',
-        width: 44, height: 44, borderRadius: '50%', background: C.white,
+        position: 'absolute', left: isMobile ? -8 : -22, top: '40%', transform: 'translateY(-50%)',
+        width: isMobile ? 36 : 44, height: isMobile ? 36 : 44, borderRadius: '50%', background: C.white,
         boxShadow: '0 4px 16px rgba(0,0,0,0.12)', border: `1px solid ${C.gray100}`,
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         cursor: 'pointer', color: C.gray600, zIndex: 5, transition: 'all 0.2s',
@@ -1262,8 +1286,8 @@ function NewsCarousel({ items, onSelect }) {
       ><ChevronLeft size={20} /></button>
 
       <button onClick={next} style={{
-        position: 'absolute', right: -22, top: '40%', transform: 'translateY(-50%)',
-        width: 44, height: 44, borderRadius: '50%', background: C.white,
+        position: 'absolute', right: isMobile ? -8 : -22, top: '40%', transform: 'translateY(-50%)',
+        width: isMobile ? 36 : 44, height: isMobile ? 36 : 44, borderRadius: '50%', background: C.white,
         boxShadow: '0 4px 16px rgba(0,0,0,0.12)', border: `1px solid ${C.gray100}`,
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         cursor: 'pointer', color: C.gray600, zIndex: 5, transition: 'all 0.2s',
@@ -1295,17 +1319,18 @@ function AboutPage({ initialTab }) {
   const [tab, setTab] = useState(initialTab || 'about');
   const [teamTab, setTeamTab] = useState('board');
   const [selectedMember, setSelectedMember] = useState(null);
+  const isMobile = useIsMobile();
   const tabs = [{ k: 'about', l: 'About Us' }, { k: 'governance', l: 'Governance' }, { k: 'team', l: 'Our Team' }, { k: 'values', l: 'Core Values' }];
 
   useEffect(() => { if (initialTab) setTab(initialTab); }, [initialTab]);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', minHeight: 'calc(100vh - 64px)' }}>
-      <div style={{ background: `linear-gradient(135deg, ${C.navyDark} 0%, ${C.navy} 100%)`, padding: '32px 60px' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
+      <div style={{ background: `linear-gradient(135deg, ${C.navyDark} 0%, ${C.navy} 100%)`, padding: isMobile ? '24px 20px' : '32px 60px' }}>
+        <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', justifyContent: 'space-between', alignItems: isMobile ? 'flex-start' : 'flex-end', gap: isMobile ? 16 : 0 }}>
           <div>
-            <h1 style={{ fontFamily: font.serif, fontSize: 30, fontWeight: 700, color: C.white }}>About Longhorn Associates</h1>
-            <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.5)', marginTop: 6 }}>SEC & PIA Licensed Investment Management Company</p>
+            <h1 style={{ fontFamily: font.serif, fontSize: isMobile ? 22 : 30, fontWeight: 700, color: C.white }}>About Longhorn Associates</h1>
+            <p style={{ fontSize: isMobile ? 12 : 14, color: 'rgba(255,255,255,0.5)', marginTop: 6 }}>SEC & PIA Licensed Investment Management Company</p>
           </div>
           <div style={{ display: 'flex', gap: 4 }}>
             {tabs.map(t => (
@@ -1321,11 +1346,11 @@ function AboutPage({ initialTab }) {
         </div>
       </div>
 
-      <div style={{ flex: 1, padding: '32px 60px', background: C.offWhite }}>
+      <div style={{ flex: 1, padding: isMobile ? '20px 16px' : '32px 60px', background: C.offWhite }}>
 
-        {/* About Us — unchanged */}
+        {/* About Us */}
         {tab === 'about' && (
-          <div style={{ display: 'grid', gridTemplateColumns: '1.3fr 1fr', gap: 32 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1.3fr 1fr', gap: 32 }}>
             <div>
               <div style={{ width: 40, height: 3, background: C.red, borderRadius: 2, marginBottom: 16 }} />
               <h2 style={{ fontFamily: font.serif, fontSize: 24, fontWeight: 700, color: C.gray900, marginBottom: 16 }}>Who We Are</h2>
@@ -1391,7 +1416,7 @@ function AboutPage({ initialTab }) {
 
         {/* Core Values — unchanged */}
         {tab === 'values' && (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(4, 1fr)', gap: 16 }}>
             {[{ I: Shield, l: 'Integrity', d: 'Complete transparency in all we do.' }, { I: TrendingUp, l: 'Performance', d: 'Delivering superior, consistent returns.' }, { I: Users, l: 'Community', d: 'Investing in Zambia\'s collective prosperity.' }, { I: Award, l: 'Excellence', d: 'Highest professional standards in everything.' }].map(({ I, l, d }) => (
               <div key={l} style={{ padding: 28, borderRadius: 14, background: C.white, boxShadow: '0 2px 8px rgba(0,0,0,0.06)', textAlign: 'center' }}>
                 <div style={{ width: 52, height: 52, borderRadius: 14, background: `${C.red}12`, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 14px' }}><I size={24} style={{ color: C.red }} /></div>
@@ -1442,16 +1467,17 @@ const branches = [
 function ContactPage() {
   const [form, setForm] = useState({ name: '', email: '', phone: '', service: '', message: '' });
   const [sent, setSent] = useState(false);
+  const isMobile = useIsMobile();
   const iS = { width: '100%', padding: '11px 14px', borderRadius: 8, border: `1.5px solid ${C.gray200}`, fontSize: 14, fontFamily: font.sans, outline: 'none', color: C.gray800, background: C.white };
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', minHeight: 'calc(100vh - 64px)' }}>
-      <div style={{ background: `linear-gradient(135deg, ${C.navyDark} 0%, ${C.navy} 100%)`, padding: '32px 60px' }}>
-        <h1 style={{ fontFamily: font.serif, fontSize: 30, fontWeight: 700, color: C.white }}>Contact Us</h1>
-        <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.5)', marginTop: 6 }}>Visit any of our 4 branches or get in touch online</p>
+      <div style={{ background: `linear-gradient(135deg, ${C.navyDark} 0%, ${C.navy} 100%)`, padding: isMobile ? '24px 20px' : '32px 60px' }}>
+        <h1 style={{ fontFamily: font.serif, fontSize: isMobile ? 22 : 30, fontWeight: 700, color: C.white }}>Contact Us</h1>
+        <p style={{ fontSize: isMobile ? 12 : 14, color: 'rgba(255,255,255,0.5)', marginTop: 6 }}>Visit any of our 4 branches or get in touch online</p>
       </div>
 
-      <div style={{ flex: 1, display: 'grid', gridTemplateColumns: '1fr 1.4fr', background: C.white }}>
+      <div style={{ flex: 1, display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1.4fr', background: C.white }}>
         {/* Branches */}
         <div style={{ padding: '28px 32px', background: C.navy, color: C.white, overflowY: 'auto' }}>
           <h3 style={{ fontFamily: font.serif, fontSize: 18, marginBottom: 20 }}>Our Locations</h3>
@@ -1627,12 +1653,13 @@ function PortalPage() {
 /*  TOOLS PAGE (Calculator standalone)        */
 /* ═══════════════════════════════════════════ */
 function ToolsPage({ onNavigate }) {
+  const isMobile = useIsMobile();
   return (
     <div style={{ display: 'flex', flexDirection: 'column', minHeight: 'calc(100vh - 64px)' }}>
       <MarketTicker />
       <div style={{
         background: `linear-gradient(135deg, ${C.navyDark} 0%, ${C.navy} 100%)`,
-        padding: '32px 60px', position: 'relative', overflow: 'hidden',
+        padding: isMobile ? '24px 20px' : '32px 60px', position: 'relative', overflow: 'hidden',
       }}>
         <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 80,
           backgroundImage: `repeating-linear-gradient(90deg, transparent, transparent 60px, rgba(255,255,255,0.03) 60px, rgba(255,255,255,0.03) 61px)`,
@@ -1641,7 +1668,7 @@ function ToolsPage({ onNavigate }) {
         <h1 style={{ fontFamily: font.serif, fontSize: 30, fontWeight: 700, color: C.white, position: 'relative' }}>ROI Calculator</h1>
         <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.5)', marginTop: 6, position: 'relative' }}>Project your investment growth across our 7 Unit Trust funds</p>
       </div>
-      <div style={{ flex: 1, padding: '32px 60px', background: C.offWhite }}>
+      <div style={{ flex: 1, padding: isMobile ? '20px 16px' : '32px 60px', background: C.offWhite }}>
         <ReturnCalculator fund={funds[3]} onNavigate={onNavigate} />
       </div>
     </div>
@@ -1681,6 +1708,7 @@ const servicesList = [
 function ServicesPage({ onNavigate, serviceId }) {
   const [detailId, setDetailId] = useState(null);
   const detail = servicesList.find(s => s.id === detailId);
+  const isMobile = useIsMobile();
 
   useEffect(() => {
     if (serviceId) {
@@ -1715,8 +1743,8 @@ function ServicesPage({ onNavigate, serviceId }) {
             </div>
           </div>
         </div>
-        <div style={{ flex: 1, padding: '40px 60px', background: C.offWhite }}>
-          <div style={{ display: 'grid', gridTemplateColumns: '1.6fr 1fr', gap: 32 }}>
+        <div style={{ flex: 1, padding: isMobile ? '20px 16px' : '40px 60px', background: C.offWhite }}>
+          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1.6fr 1fr', gap: 32 }}>
             <div>
               <img src={detail.image} alt={detail.label} style={{ width: '100%', height: 280, objectFit: 'cover', borderRadius: 16, marginBottom: 28 }} />
               <h2 style={{ fontFamily: font.serif, fontSize: 22, fontWeight: 700, color: C.gray900, marginBottom: 16 }}>About This Service</h2>
@@ -1773,7 +1801,7 @@ function ServicesPage({ onNavigate, serviceId }) {
       {/* Header */}
       <div style={{
         background: `linear-gradient(135deg, ${C.navyDark} 0%, ${C.navy} 100%)`,
-        padding: '40px 60px', position: 'relative', overflow: 'hidden',
+        padding: isMobile ? '24px 20px' : '40px 60px', position: 'relative', overflow: 'hidden',
       }}>
         <div style={{
           position: 'absolute', inset: 0,
@@ -1801,11 +1829,11 @@ function ServicesPage({ onNavigate, serviceId }) {
       </div>
 
       {/* Service cards */}
-      <div style={{ flex: 1, padding: '40px 60px', background: C.offWhite }}>
+      <div style={{ flex: 1, padding: isMobile ? '20px 16px' : '40px 60px', background: C.offWhite }}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 32 }}>
           {servicesList.map(({ id, icon: Icon, label, tagline, desc, features, color, image }, i) => (
             <div key={id} id={`svc-${id}`} style={{
-              display: 'grid', gridTemplateColumns: i % 2 === 0 ? '1fr 1.6fr' : '1.6fr 1fr',
+              display: 'grid', gridTemplateColumns: isMobile ? '1fr' : (i % 2 === 0 ? '1fr 1.6fr' : '1.6fr 1fr'),
               background: C.white, borderRadius: 16, overflow: 'hidden',
               boxShadow: '0 2px 8px rgba(0,0,0,0.06)', border: `1px solid ${C.gray100}`,
             }}>
@@ -1912,18 +1940,19 @@ const jobListings = [
 
 function CareersPage({ onNavigate }) {
   const [selectedJob, setSelectedJob] = useState(null);
+  const isMobile = useIsMobile();
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', minHeight: 'calc(100vh - 64px)' }}>
       <MarketTicker />
-      <div style={{ background: `linear-gradient(135deg, ${C.navyDark} 0%, ${C.navy} 100%)`, padding: '40px 60px' }}>
-        <h1 style={{ fontFamily: font.serif, fontSize: 30, fontWeight: 700, color: C.white }}>Careers at Longhorn</h1>
+      <div style={{ background: `linear-gradient(135deg, ${C.navyDark} 0%, ${C.navy} 100%)`, padding: isMobile ? '24px 20px' : '40px 60px' }}>
+        <h1 style={{ fontFamily: font.serif, fontSize: isMobile ? 22 : 30, fontWeight: 700, color: C.white }}>Careers at Longhorn</h1>
         <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.5)', marginTop: 6 }}>Join our team and help build Zambia's financial future</p>
       </div>
 
-      <div style={{ flex: 1, padding: '32px 60px', background: C.offWhite }}>
+      <div style={{ flex: 1, padding: isMobile ? '20px 16px' : '32px 60px', background: C.offWhite }}>
         {/* Intro */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr', gap: 32, marginBottom: 36 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1.4fr 1fr', gap: 32, marginBottom: 36 }}>
           <div>
             <div style={{ width: 40, height: 3, background: C.red, borderRadius: 2, marginBottom: 16 }} />
             <h2 style={{ fontFamily: font.serif, fontSize: 24, fontWeight: 700, color: C.gray900, marginBottom: 12 }}>Why Work With Us?</h2>
@@ -2006,7 +2035,9 @@ export default function App() {
   const [dropdown, setDropdown] = useState(null);
   const [aboutTab, setAboutTab] = useState('about');
   const [serviceId, setServiceId] = useState(null);
+  const [mobileMenu, setMobileMenu] = useState(false);
   const scrollRef = useRef(null);
+  const isMobile = useIsMobile();
 
   const navigate = useCallback((p, fId, tab) => {
     if (p === 'fund') {
@@ -2023,6 +2054,7 @@ export default function App() {
       if (p === 'products') setServiceId(null);
     }
     setDropdown(null);
+    setMobileMenu(false);
     if (scrollRef.current) scrollRef.current.scrollTop = 0;
   }, []);
 
@@ -2050,83 +2082,136 @@ export default function App() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', width: '100vw', overflow: 'hidden', fontFamily: font.sans, background: C.white, WebkitFontSmoothing: 'antialiased' }}>
       <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700;800&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
-      <style>{`* { box-sizing: border-box; margin: 0; padding: 0; } input[type="range"] { height: 4px; } input[type="range"]::-webkit-slider-thumb { width: 16px; height: 16px; }`}</style>
+      <style>{`* { box-sizing: border-box; margin: 0; padding: 0; } input[type="range"] { height: 4px; } input[type="range"]::-webkit-slider-thumb { width: 16px; height: 16px; }
+        @media (max-width: 768px) {
+          .resp-grid-2 { grid-template-columns: 1fr !important; }
+          .resp-grid-3 { grid-template-columns: 1fr !important; }
+          .resp-grid-4 { grid-template-columns: 1fr 1fr !important; }
+          .resp-grid-6 { grid-template-columns: repeat(3, 1fr) !important; }
+          .resp-flex-col { flex-direction: column !important; }
+          .resp-hide { display: none !important; }
+        }
+      `}</style>
 
       {/* ── TOP NAV ── */}
       <nav style={{
         height: 64, minHeight: 64, background: C.white, borderBottom: `1px solid ${C.gray100}`,
-        display: 'flex', alignItems: 'center', padding: '0 40px', zIndex: 200, position: 'relative',
+        display: 'flex', alignItems: 'center', padding: isMobile ? '0 16px' : '0 40px', zIndex: 200, position: 'relative',
       }}>
         {/* Logo */}
         <div onClick={() => navigate('home')} style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 10 }}>
-          <img src="/logo.jpeg" alt="Longhorn Associates" style={{ height: 42, width: 'auto', objectFit: 'contain' }}
+          <img src="/logo.jpeg" alt="Longhorn Associates" style={{ height: isMobile ? 34 : 42, width: 'auto', objectFit: 'contain' }}
             onError={e => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'flex'; }} />
           <div style={{ display: 'none', alignItems: 'center', gap: 3 }}>
-            <span style={{ fontFamily: font.serif, fontSize: 22, fontWeight: 800, color: C.red }}>Longhorn</span>
-            <span style={{ fontFamily: font.sans, fontSize: 14, fontWeight: 600, color: C.navy, marginTop: 2 }}>Associates</span>
+            <span style={{ fontFamily: font.serif, fontSize: isMobile ? 18 : 22, fontWeight: 800, color: C.red }}>Longhorn</span>
+            <span style={{ fontFamily: font.sans, fontSize: isMobile ? 11 : 14, fontWeight: 600, color: C.navy, marginTop: 2 }}>Associates</span>
           </div>
         </div>
 
-        {/* Nav links */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 2, marginLeft: 'auto' }}>
-          {navItems.map(item => (
-            <div key={item.label} style={{ position: 'relative' }}
-              onMouseEnter={() => item.hasDropdown && setDropdown(item.label)}
-              onMouseLeave={() => setDropdown(null)}
-            >
-              <button onClick={item.action} style={{
-                display: 'flex', alignItems: 'center', gap: 4, padding: '8px 16px',
-                fontSize: 14, fontWeight: 500, color: C.gray600, background: 'none',
-                border: 'none', cursor: 'pointer', fontFamily: font.sans,
-                transition: 'color 0.2s',
-              }}
-                onMouseEnter={e => e.currentTarget.style.color = C.navy}
-                onMouseLeave={e => e.currentTarget.style.color = C.gray600}
+        {/* Desktop nav links */}
+        {!isMobile && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 2, marginLeft: 'auto' }}>
+            {navItems.map(item => (
+              <div key={item.label} style={{ position: 'relative' }}
+                onMouseEnter={() => item.hasDropdown && setDropdown(item.label)}
+                onMouseLeave={() => setDropdown(null)}
               >
-                {item.label}
-                {item.hasDropdown && <ChevronDown size={14} />}
-              </button>
+                <button onClick={item.action} style={{
+                  display: 'flex', alignItems: 'center', gap: 4, padding: '8px 16px',
+                  fontSize: 14, fontWeight: 500, color: C.gray600, background: 'none',
+                  border: 'none', cursor: 'pointer', fontFamily: font.sans, transition: 'color 0.2s',
+                }}
+                  onMouseEnter={e => e.currentTarget.style.color = C.navy}
+                  onMouseLeave={e => e.currentTarget.style.color = C.gray600}
+                >
+                  {item.label}
+                  {item.hasDropdown && <ChevronDown size={14} />}
+                </button>
+                {item.hasDropdown && dropdown === item.label && (
+                  <div style={{
+                    position: 'absolute', top: '100%', left: 0, minWidth: 200,
+                    background: C.white, borderRadius: 10, boxShadow: '0 10px 40px rgba(0,0,0,0.12)',
+                    border: `1px solid ${C.gray100}`, padding: '6px 0', zIndex: 300,
+                  }}>
+                    {item.items.map(sub => (
+                      <button key={sub.label} onClick={sub.action} style={{
+                        display: 'block', width: '100%', textAlign: 'left', padding: '10px 18px',
+                        fontSize: 13, fontWeight: 500, color: C.gray600, background: 'transparent',
+                        border: 'none', cursor: 'pointer', fontFamily: font.sans, transition: 'all 0.15s',
+                      }}
+                        onMouseEnter={e => { e.currentTarget.style.background = C.gray50; e.currentTarget.style.color = C.red; }}
+                        onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = C.gray600; }}
+                      >{sub.label}</button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ))}
+            <button onClick={() => navigate('portal')} style={{
+              marginLeft: 12, padding: '9px 20px', background: C.red, color: C.white,
+              fontSize: 12, fontWeight: 700, fontFamily: font.sans, border: 'none',
+              borderRadius: 6, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 6,
+              transition: 'all 0.2s', letterSpacing: '0.02em',
+            }}
+              onMouseEnter={e => e.currentTarget.style.background = C.redHover}
+              onMouseLeave={e => e.currentTarget.style.background = C.red}
+            >Signup / Login <ArrowUpRight size={12} /></button>
+          </div>
+        )}
 
-              {/* Dropdown */}
-              {item.hasDropdown && dropdown === item.label && (
-                <div style={{
-                  position: 'absolute', top: '100%', left: 0, minWidth: 200,
-                  background: C.white, borderRadius: 10, boxShadow: '0 10px 40px rgba(0,0,0,0.12)',
-                  border: `1px solid ${C.gray100}`, padding: '6px 0', zIndex: 300,
-                }}>
-                  {item.items.map(sub => (
-                    <button key={sub.label} onClick={sub.action} style={{
-                      display: 'block', width: '100%', textAlign: 'left', padding: '10px 18px',
-                      fontSize: 13, fontWeight: 500, color: C.gray600, background: 'transparent',
-                      border: 'none', cursor: 'pointer', fontFamily: font.sans,
-                      transition: 'all 0.15s',
-                    }}
-                      onMouseEnter={e => { e.currentTarget.style.background = C.gray50; e.currentTarget.style.color = C.red; }}
-                      onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = C.gray600; }}
-                    >{sub.label}</button>
-                  ))}
-                </div>
-              )}
-            </div>
-          ))}
-
-          <button onClick={() => navigate('portal')} style={{
-            marginLeft: 12, padding: '9px 20px', background: C.red, color: C.white,
-            fontSize: 12, fontWeight: 700, fontFamily: font.sans, border: 'none',
-            borderRadius: 6, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 6,
-            transition: 'all 0.2s', letterSpacing: '0.02em',
-          }}
-            onMouseEnter={e => e.currentTarget.style.background = C.redHover}
-            onMouseLeave={e => e.currentTarget.style.background = C.red}
-          >
-            Signup / Login <ArrowUpRight size={12} />
+        {/* Mobile hamburger */}
+        {isMobile && (
+          <button onClick={() => setMobileMenu(!mobileMenu)} style={{
+            marginLeft: 'auto', width: 40, height: 40, borderRadius: 8, border: 'none',
+            background: 'transparent', cursor: 'pointer', display: 'flex', alignItems: 'center',
+            justifyContent: 'center', color: C.gray700,
+          }}>
+            {mobileMenu ? <X size={22} /> : <Menu size={22} />}
           </button>
-
-          <button style={{ marginLeft: 8, width: 36, height: 36, borderRadius: 8, border: 'none', background: 'transparent', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: C.gray500 }}>
-            <Search size={18} />
-          </button>
-        </div>
+        )}
       </nav>
+
+      {/* Mobile menu overlay */}
+      {isMobile && mobileMenu && (
+        <div style={{
+          position: 'fixed', top: 64, left: 0, right: 0, bottom: 0,
+          background: C.white, zIndex: 199, overflowY: 'auto',
+          animation: 'mobileSlideDown 0.25s ease both',
+        }}>
+          <style>{`@keyframes mobileSlideDown { from { opacity:0; transform:translateY(-10px); } to { opacity:1; transform:translateY(0); } }`}</style>
+          <div style={{ padding: '16px 20px' }}>
+            {navItems.map(item => (
+              <div key={item.label} style={{ borderBottom: `1px solid ${C.gray100}` }}>
+                <button onClick={() => { if (item.action) { item.action(); } else { setDropdown(dropdown === item.label ? null : item.label); } }} style={{
+                  display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%',
+                  padding: '14px 0', fontSize: 15, fontWeight: 600, color: C.gray800,
+                  background: 'none', border: 'none', cursor: 'pointer', fontFamily: font.sans,
+                }}>
+                  {item.label}
+                  {item.hasDropdown && <ChevronDown size={16} style={{ transform: dropdown === item.label ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />}
+                </button>
+                {item.hasDropdown && dropdown === item.label && (
+                  <div style={{ paddingBottom: 8 }}>
+                    {item.items.map(sub => (
+                      <button key={sub.label} onClick={sub.action} style={{
+                        display: 'block', width: '100%', textAlign: 'left', padding: '10px 16px',
+                        fontSize: 14, fontWeight: 500, color: C.gray600, background: 'transparent',
+                        border: 'none', cursor: 'pointer', fontFamily: font.sans,
+                      }}>{sub.label}</button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ))}
+            <button onClick={() => navigate('portal')} style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+              width: '100%', padding: '14px 0', background: C.red, color: C.white,
+              fontWeight: 700, fontSize: 14, borderRadius: 8, border: 'none', cursor: 'pointer',
+              fontFamily: font.sans, marginTop: 16,
+            }}>Signup / Login <ArrowUpRight size={14} /></button>
+          </div>
+        </div>
+      )}
 
       {/* ── PAGE CONTENT ── */}
       <div ref={scrollRef} style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden' }}>
