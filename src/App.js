@@ -73,15 +73,14 @@ function genChart(months=12, base=100, growth=0.08) {
 const LONGHORN_API = process.env.REACT_APP_LONGHORN_API || 'https://longhorn-api.onrender.com';
 
 /* ═══════════════════════════════════════════ */
-/*  MARKET TICKER (Longhorn API)               */
+/*  MARKET TICKER (Foreign Exchange API)       */
 /* ═══════════════════════════════════════════ */
 const FALLBACK_TICKER = [
-  { label: 'Market Updates', value: '', isLabel: true },
-  { label: 'LuSE ASI', value: '+9.4%', positive: true },
-  { label: 'USD/ZMW', value: '27.10' },
-  { label: '10Y Bond Yield', value: '16.8%' },
-  { label: 'Inflation', value: '12.3%' },
-  { label: 'BoZ Rate', value: '12.5%' },
+  { label: 'Not vs Working', value: '', isLabel: true },
+  { label: 'Not/ZMW', value: '-0.5%', gain: true },
+  { label: 'Not/ZMW', value: '-1.4%', gain: true },
+  { label: 'Not/ZMW', value: '+0.3%', gain: false },
+  { label: 'Not/ZMW', value: '+0.8%', gain: false },
 ];
 
 function MarketTicker() {
@@ -90,36 +89,40 @@ function MarketTicker() {
   useEffect(() => {
     let cancelled = false;
 
-    /* ── Always fetch root message first ── */
-    fetch(`${LONGHORN_API}/`)
-      .then(r => r.json())
-      .then(data => {
-        if (cancelled) return;
-        if (data.message) {
-          setItems([
-            { label: 'Longhorn API', value: '', isLabel: true },
-            { label: 'Status', value: data.message, positive: true },
-          ]);
-        }
-      })
-      .catch(() => { /* Root unreachable — keep fallback */ });
-
-    /* ── Then try /api/stock-prices/ — if it has real data, override ── */
-    fetch(`${LONGHORN_API}/api/stock-prices/`)
+    fetch(`${LONGHORN_API}/api/foreign-exchange/`)
       .then(r => { if (!r.ok) throw new Error(r.status); return r.json(); })
       .then(data => {
         if (cancelled) return;
         const rows = Array.isArray(data) ? data : data.results || [];
         if (rows.length > 0) {
-          setItems(rows.map(d => ({
-            label: d.label || d.name || d.symbol || '',
-            value: d.value || d.price || d.change || '',
-            positive: d.is_positive || d.positive || (d.change && !String(d.change).startsWith('-')) || false,
-            isLabel: d.is_label_badge || d.isLabel || false,
-          })));
+          /* Get date from first row for the header badge */
+          const fxDate = rows[0].date || '';
+          const formattedDate = fxDate ? new Date(fxDate + 'T00:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '';
+
+          const tickerData = [
+            { label: `FX Rates vs ZMW`, value: formattedDate, isLabel: true },
+          ];
+
+          rows.forEach(row => {
+            const pctChange = row.percentChangeFromPreviousRate;
+            const direction = (row.direction || '').toLowerCase();
+            /* ZMW-Up means kwacha gained (positive for Zambia) → green */
+            const zmwGained = direction.includes('zmw-up') || direction.includes('zmw up');
+            const changeStr = pctChange >= 0 ? `+${pctChange.toFixed(2)}%` : `${pctChange.toFixed(2)}%`;
+
+            tickerData.push({
+              label: `${row.currency}/ZMW`,
+              value: changeStr,
+              rate: row.midRate ? row.midRate.toFixed(2) : null,
+              gain: zmwGained,
+              isLabel: false,
+            });
+          });
+
+          setItems(tickerData);
         }
       })
-      .catch(() => { /* stock-prices not ready yet — root message stays */ });
+      .catch(() => { /* API unreachable — keep fallback */ });
 
     return () => { cancelled = true; };
   }, []);
@@ -133,17 +136,27 @@ function MarketTicker() {
       <style>{`@keyframes tickerScroll { 0% { transform: translateX(0); } 100% { transform: translateX(-33.333%); } }`}</style>
       <div style={{
         display: 'flex', alignItems: 'center', gap: 24, whiteSpace: 'nowrap',
-        animation: 'tickerScroll 20s linear infinite',
+        animation: 'tickerScroll 25s linear infinite',
       }}>
         {tickerItems.map((item, i) => (
           <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             {item.isLabel ? (
-              <span style={{ fontSize: 12, fontWeight: 700, color: C.white, background: C.red, padding: '4px 12px', borderRadius: 4 }}>{item.label}</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ fontSize: 12, fontWeight: 700, color: C.white, background: C.red, padding: '4px 12px', borderRadius: 4 }}>{item.label}</span>
+                {item.value && <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.6)', fontWeight: 500 }}>{item.value}</span>}
+              </div>
             ) : (
               <>
                 <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.75)', fontWeight: 500 }}>{item.label}</span>
-                <div style={{ width: 4, height: 12, borderRadius: 1, background: item.positive ? '#4ADE80' : 'rgba(255,255,255,0.5)', marginRight: 2 }} />
-                <span style={{ fontSize: 13, fontWeight: 700, color: item.positive ? '#4ADE80' : C.white }}>{item.value}</span>
+                {item.rate && <span style={{ fontSize: 13, fontWeight: 700, color: C.white }}>{item.rate}</span>}
+                <div style={{
+                  width: 0, height: 0,
+                  borderLeft: '4px solid transparent', borderRight: '4px solid transparent',
+                  borderBottom: item.gain ? '6px solid #4ADE80' : 'none',
+                  borderTop: !item.gain ? '6px solid #F87171' : 'none',
+                  marginRight: 2,
+                }} />
+                <span style={{ fontSize: 12, fontWeight: 600, color: item.gain ? '#4ADE80' : '#F87171' }}>{item.value}</span>
                 {i < tickerItems.length - 1 && <div style={{ width: 1, height: 16, background: 'rgba(255,255,255,0.2)', marginLeft: 16 }} />}
               </>
             )}
@@ -1714,8 +1727,19 @@ function ServicesPage({ onNavigate, serviceId }) {
     if (serviceId) {
       setTimeout(() => {
         const el = document.getElementById(`svc-${serviceId}`);
-        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      }, 200);
+        if (el) {
+          /* Find the scrollable parent (scrollRef div) instead of using scrollIntoView
+             which can scroll the entire viewport on mobile and hide the nav bar */
+          const scrollParent = el.closest('[data-scroll-container]') || el.closest('div[style*="overflow"]');
+          if (scrollParent) {
+            const elRect = el.getBoundingClientRect();
+            const parentRect = scrollParent.getBoundingClientRect();
+            scrollParent.scrollTo({ top: scrollParent.scrollTop + elRect.top - parentRect.top - 10, behavior: 'smooth' });
+          } else {
+            el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+          }
+        }
+      }, 300);
     }
   }, [serviceId]);
 
@@ -2214,7 +2238,7 @@ export default function App() {
       )}
 
       {/* ── PAGE CONTENT ── */}
-      <div ref={scrollRef} style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden' }}>
+      <div ref={scrollRef} data-scroll-container="true" style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden' }}>
         {page === 'home' && <HomePage onNavigate={navigate} />}
         {page === 'fund' && <FundDetailPage fundId={fundId} onNavigate={navigate} />}
         {page === 'products' && <ServicesPage onNavigate={navigate} serviceId={serviceId} />}
