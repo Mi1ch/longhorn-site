@@ -1,8 +1,16 @@
 {
   "rewrites": [
     {
-      "source": "/api/foreign-exchange/:path*",
-      "destination": "https://longhorn-api.onrender.com/api/foreign-exchange/:path*"
+      "source": "/api/foreign-exchange/",
+      "destination": "https://longhorn-api.onrender.com/api/foreign-exchange/"
+    },
+    {
+      "source": "/api/foreign-exchange",
+      "destination": "https://longhorn-api.onrender.com/api/foreign-exchange/"
+    },
+    {
+      "source": "/api/:path*",
+      "destination": "https://longhorn-api.onrender.com/api/:path*"
     }
   ]
 }
