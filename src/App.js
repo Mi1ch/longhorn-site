@@ -86,16 +86,21 @@ const FALLBACK_TICKER = [
 function MarketTicker() {
   const [items, setItems] = useState(FALLBACK_TICKER);
 
-  useEffect(() => {
+ useEffect(() => {
     let cancelled = false;
 
-    fetch(`${LONGHORN_API}/api/foreign-exchange/`)
-      .then(r => { if (!r.ok) throw new Error(r.status); return r.json(); })
+    fetch(`/api/foreign-exchange/`)
+      .then(r => {
+        if (!r.ok) {
+          console.error(`API Error: ${r.status} - ${r.statusText}`);
+          throw new Error(`HTTP error! status: ${r.status}`);
+        }
+        return r.json();
+      })
       .then(data => {
         if (cancelled) return;
         const rows = Array.isArray(data) ? data : data.results || [];
         if (rows.length > 0) {
-          /* Get date from first row for the header badge */
           const fxDate = rows[0].date || '';
           const formattedDate = fxDate ? new Date(fxDate + 'T00:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '';
 
@@ -106,7 +111,6 @@ function MarketTicker() {
           rows.forEach(row => {
             const pctChange = row.percentChangeFromPreviousRate;
             const direction = (row.direction || '').toLowerCase();
-            /* ZMW-Up means kwacha gained (positive for Zambia) → green */
             const zmwGained = direction.includes('zmw-up') || direction.includes('zmw up');
             const changeStr = pctChange >= 0 ? `+${pctChange.toFixed(2)}%` : `${pctChange.toFixed(2)}%`;
 
@@ -120,9 +124,17 @@ function MarketTicker() {
           });
 
           setItems(tickerData);
+        } else {
+          console.warn("API returned empty data, using fallback ticker.");
+          setItems(FALLBACK_TICKER); // Explicitly set fallback if API returns empty array
         }
       })
-      .catch(() => { /* API unreachable — keep fallback */ });
+      .catch(error => {
+        console.error("Failed to fetch or process foreign exchange data:", error);
+        if (!cancelled) {
+          setItems(FALLBACK_TICKER); // Ensure fallback is used on error
+        }
+      });
 
     return () => { cancelled = true; };
   }, []);
