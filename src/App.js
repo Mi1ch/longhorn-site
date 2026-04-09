@@ -73,47 +73,67 @@ function genChart(months=12, base=100, growth=0.08) {
 const LONGHORN_API = process.env.REACT_APP_LONGHORN_API || 'https://longhorn-api.onrender.com';
 
 /* ═══════════════════════════════════════════ */
-/*  MARKET TICKER (Foreign Exchange API)       */
+/*  MARKET TICKER (Fund Performance + FX API)  */
 /* ═══════════════════════════════════════════ */
 const FALLBACK_TICKER = [
-  { label: 'Not vs Working', value: '', isLabel: true },
-  { label: 'Not/ZMW', value: '-0.5%', gain: true },
-  { label: 'Not/ZMW', value: '-1.4%', gain: true },
-  { label: 'Not/ZMW', value: '+0.3%', gain: false },
-  { label: 'Not/ZMW', value: '+0.8%', gain: false },
+  { label: 'Fund Performance', value: '', isLabel: true },
+  { label: 'Equity Fund', value: 'K1.25', isFund: true, yield12: '12.4%' },
+  { label: 'Bond Fund', value: 'K1.08', isFund: true, yield12: '8.2%' },
+  { label: 'FX Rates vs ZMW', value: '', isLabel: true },
+  { label: 'USD/ZMW', value: '-0.5%', gain: true },
+  { label: 'EUR/ZMW', value: '-1.4%', gain: true },
 ];
 
 function MarketTicker() {
   const [items, setItems] = useState(FALLBACK_TICKER);
 
- useEffect(() => {
+  useEffect(() => {
     let cancelled = false;
 
-    fetch(`/api/foreign-exchange/`)
-      .then(r => {
-        if (!r.ok) {
-          console.error(`API Error: ${r.status} - ${r.statusText}`);
-          throw new Error(`HTTP error! status: ${r.status}`);
+    /* Fetch both APIs in parallel */
+    Promise.allSettled([
+      fetch('/api/fund-performance/').then(r => { if (!r.ok) throw new Error(r.status); return r.json(); }),
+      fetch('/api/foreign-exchange/').then(r => { if (!r.ok) throw new Error(r.status); return r.json(); }),
+    ]).then(([fundResult, fxResult]) => {
+      if (cancelled) return;
+      const tickerData = [];
+
+      /* ── FUND PERFORMANCE (first) ── */
+      if (fundResult.status === 'fulfilled') {
+        const fundRows = Array.isArray(fundResult.value) ? fundResult.value : fundResult.value.results || [];
+        if (fundRows.length > 0) {
+          const fundDate = fundRows[0].date || '';
+          const fmtFundDate = fundDate ? new Date(fundDate + 'T00:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '';
+          tickerData.push({ label: 'Fund Performance', value: fmtFundDate, isLabel: true });
+
+          fundRows.forEach(row => {
+            const yieldVal = row.averageYieldTwelveMonths;
+            const yieldStr = yieldVal != null ? `${yieldVal >= 0 ? '+' : ''}${Number(yieldVal).toFixed(2)}%` : null;
+            tickerData.push({
+              label: row.fund || 'Fund',
+              value: row.price != null ? `K${Number(row.price).toFixed(4)}` : '',
+              yield12: yieldStr,
+              isFund: true,
+              gain: yieldVal != null ? yieldVal >= 0 : true,
+              isLabel: false,
+            });
+          });
         }
-        return r.json();
-      })
-      .then(data => {
-        if (cancelled) return;
-        const rows = Array.isArray(data) ? data : data.results || [];
-        if (rows.length > 0) {
-          const fxDate = rows[0].date || '';
-          const formattedDate = fxDate ? new Date(fxDate + 'T00:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '';
+      }
 
-          const tickerData = [
-            { label: `FX Rates vs ZMW`, value: formattedDate, isLabel: true },
-          ];
+      /* ── FOREIGN EXCHANGE (after funds) ── */
+      if (fxResult.status === 'fulfilled') {
+        const fxRows = Array.isArray(fxResult.value) ? fxResult.value : fxResult.value.results || [];
+        if (fxRows.length > 0) {
+          const fxDate = fxRows[0].date || '';
+          const fmtFxDate = fxDate ? new Date(fxDate + 'T00:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '';
+          tickerData.push({ label: 'FX Rates vs ZMW', value: fmtFxDate, isLabel: true });
 
-          rows.forEach(row => {
+          fxRows.forEach(row => {
             const pctChange = row.percentChangeFromPreviousRate;
             const direction = (row.direction || '').toLowerCase();
             const zmwGained = direction.includes('zmw-up') || direction.includes('zmw up');
             const changeStr = pctChange >= 0 ? `+${pctChange.toFixed(2)}%` : `${pctChange.toFixed(2)}%`;
-
             tickerData.push({
               label: `${row.currency}/ZMW`,
               value: changeStr,
@@ -122,19 +142,13 @@ function MarketTicker() {
               isLabel: false,
             });
           });
+        }
+      }
 
-          setItems(tickerData);
-        } else {
-          console.warn("API returned empty data, using fallback ticker.");
-          setItems(FALLBACK_TICKER); // Explicitly set fallback if API returns empty array
-        }
-      })
-      .catch(error => {
-        console.error("Failed to fetch or process foreign exchange data:", error);
-        if (!cancelled) {
-          setItems(FALLBACK_TICKER); // Ensure fallback is used on error
-        }
-      });
+      if (tickerData.length > 0) {
+        setItems(tickerData);
+      }
+    });
 
     return () => { cancelled = true; };
   }, []);
@@ -148,15 +162,27 @@ function MarketTicker() {
       <style>{`@keyframes tickerScroll { 0% { transform: translateX(0); } 100% { transform: translateX(-33.333%); } }`}</style>
       <div style={{
         display: 'flex', alignItems: 'center', gap: 24, whiteSpace: 'nowrap',
-        animation: 'tickerScroll 25s linear infinite',
+        animation: 'tickerScroll 35s linear infinite',
       }}>
         {tickerItems.map((item, i) => (
           <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             {item.isLabel ? (
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span style={{ fontSize: 12, fontWeight: 700, color: C.white, background: C.red, padding: '4px 12px', borderRadius: 4 }}>{item.label}</span>
+                <span style={{ fontSize: 12, fontWeight: 700, color: C.white, background: item.label.includes('Fund') ? C.red : C.green, padding: '4px 12px', borderRadius: 4 }}>{item.label}</span>
                 {item.value && <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.6)', fontWeight: 500 }}>{item.value}</span>}
               </div>
+            ) : item.isFund ? (
+              <>
+                <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.75)', fontWeight: 500 }}>{item.label}</span>
+                <span style={{ fontSize: 13, fontWeight: 700, color: C.white }}>{item.value}</span>
+                {item.yield12 && (
+                  <>
+                    <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)', fontWeight: 500 }}>12M:</span>
+                    <span style={{ fontSize: 12, fontWeight: 600, color: item.gain ? '#4ADE80' : '#F87171' }}>{item.yield12}</span>
+                  </>
+                )}
+                {i < tickerItems.length - 1 && <div style={{ width: 1, height: 16, background: 'rgba(255,255,255,0.2)', marginLeft: 16 }} />}
+              </>
             ) : (
               <>
                 <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.75)', fontWeight: 500 }}>{item.label}</span>
@@ -890,12 +916,138 @@ const newsItems = [
   { title: 'White Coat Fund Spotlight', date: 'Aug 2024', cat: 'Funds', excerpt: 'Lowest fee at 2.5% — designed for medical professionals.' },
 ];
 
+/* ══════════════════════════════════════════════
+   FUNDS TAB — live from /api/fund-performance/
+   One section per fund with a 3M/6M/12M yield bar chart
+   ══════════════════════════════════════════════ */
+function FundsTab({ isMobile }) {
+  const [fundRows, setFundRows] = useState(null);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch('/api/fund-performance/')
+      .then(r => { if (!r.ok) throw new Error(r.status); return r.json(); })
+      .then(data => {
+        if (cancelled) return;
+        const rows = Array.isArray(data) ? data : data.results || [];
+        setFundRows(rows);
+      })
+      .catch(err => { if (!cancelled) setError(String(err)); });
+    return () => { cancelled = true; };
+  }, []);
+
+  if (error) {
+    return (
+      <div style={{ flex: 1, padding: isMobile ? '20px 16px' : '28px 60px', background: C.offWhite }}>
+        <div style={{ padding: 24, borderRadius: 12, background: C.white, border: `1px solid ${C.gray100}`, textAlign: 'center' }}>
+          <AlertTriangle size={28} style={{ color: C.red, marginBottom: 8 }} />
+          <div style={{ fontSize: 14, color: C.gray600 }}>Unable to load fund performance data.</div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!fundRows) {
+    return (
+      <div style={{ flex: 1, padding: isMobile ? '20px 16px' : '28px 60px', background: C.offWhite }}>
+        <div style={{ padding: 40, textAlign: 'center', color: C.gray400, fontSize: 14 }}>Loading fund performance…</div>
+      </div>
+    );
+  }
+
+  /* Format date nicely */
+  const fmtDate = (d) => d ? new Date(d + 'T00:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '';
+
+  return (
+    <div style={{ flex: 1, padding: isMobile ? '20px 16px' : '28px 60px', background: C.offWhite }}>
+      <div style={{ marginBottom: 20 }}>
+        <h3 style={{ fontFamily: font.serif, fontSize: 20, fontWeight: 700, color: C.gray900, marginBottom: 4 }}>Longhorn Fund Performance</h3>
+        <p style={{ fontSize: 13, color: C.gray500 }}>Live prices and yields for our unit trust funds. Scroll to explore each fund in detail.</p>
+      </div>
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+        {fundRows.map((row, idx) => {
+          const yields = [
+            { label: '3 Months', value: Number(row.averageYieldThreeMonths) || 0 },
+            { label: '6 Months', value: Number(row.averageYieldSixMonths) || 0 },
+            { label: '12 Months', value: Number(row.averageYieldTwelveMonths) || 0 },
+          ];
+          const maxY = Math.max(...yields.map(y => Math.abs(y.value)), 1);
+          const price = row.price != null ? Number(row.price).toFixed(4) : '—';
+          const y12 = yields[2].value;
+
+          return (
+            <div key={row.fund || idx} style={{
+              padding: isMobile ? 20 : 28, borderRadius: 16, background: C.white,
+              border: `1px solid ${C.gray100}`, boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
+            }}>
+              {/* Header row */}
+              <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', justifyContent: 'space-between', alignItems: isMobile ? 'flex-start' : 'flex-end', gap: 16, marginBottom: 24, paddingBottom: 20, borderBottom: `1px solid ${C.gray100}` }}>
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
+                    <div style={{ width: 4, height: 22, borderRadius: 2, background: C.red }} />
+                    <h3 style={{ fontFamily: font.serif, fontSize: isMobile ? 18 : 22, fontWeight: 700, color: C.gray900 }}>{row.fund || 'Fund'}</h3>
+                  </div>
+                  <p style={{ fontSize: 12, color: C.gray400, marginLeft: 14 }}>As at {fmtDate(row.date)}</p>
+                </div>
+                <div style={{ display: 'flex', gap: 12 }}>
+                  <div style={{ padding: '10px 16px', borderRadius: 10, background: C.offWhite, border: `1px solid ${C.gray100}`, minWidth: 110 }}>
+                    <div style={{ fontSize: 10, fontWeight: 600, color: C.gray400, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Unit Price</div>
+                    <div style={{ fontSize: 20, fontWeight: 800, color: C.navy, fontFamily: font.serif }}>K{price}</div>
+                  </div>
+                  <div style={{ padding: '10px 16px', borderRadius: 10, background: y12 >= 0 ? `${C.green}10` : `${C.red}10`, border: `1px solid ${y12 >= 0 ? `${C.green}30` : `${C.red}30`}`, minWidth: 110 }}>
+                    <div style={{ fontSize: 10, fontWeight: 600, color: C.gray400, textTransform: 'uppercase', letterSpacing: '0.05em' }}>12M Yield</div>
+                    <div style={{ fontSize: 20, fontWeight: 800, color: y12 >= 0 ? C.green : C.red, fontFamily: font.serif }}>
+                      {y12 >= 0 ? '+' : ''}{y12.toFixed(2)}%
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Yield bars */}
+              <div style={{ marginBottom: 8 }}>
+                <div style={{ fontSize: 12, fontWeight: 600, color: C.gray500, marginBottom: 16, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Average Yield Over Time</div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+                  {yields.map((y, i) => {
+                    const pct = (Math.abs(y.value) / maxY) * 100;
+                    const barColor = y.value >= 0 ? C.green : C.red;
+                    return (
+                      <div key={y.label}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 6 }}>
+                          <span style={{ fontSize: 13, fontWeight: 600, color: C.gray700 }}>{y.label}</span>
+                          <span style={{ fontSize: 16, fontWeight: 800, color: barColor, fontFamily: font.serif }}>
+                            {y.value >= 0 ? '+' : ''}{y.value.toFixed(2)}%
+                          </span>
+                        </div>
+                        <div style={{ position: 'relative', height: 14, background: C.gray50, borderRadius: 7, overflow: 'hidden' }}>
+                          <div style={{
+                            position: 'absolute', top: 0, left: 0, height: '100%',
+                            width: `${pct}%`,
+                            background: `linear-gradient(90deg, ${barColor}, ${barColor}dd)`,
+                            borderRadius: 7,
+                            transition: 'width 0.8s ease',
+                          }} />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 function InsightsPage({ onNavigate }) {
-  const [tab, setTab] = useState('markets');
+  const [tab, setTab] = useState('funds');
   const [selectedNews, setSelectedNews] = useState(null);
   const isMobile = useIsMobile();
-  const tabs = ['Markets', 'Funds', 'News & Events'];
-  const tabKeys = ['markets', 'funds', 'news'];
+  const tabs = ['Funds', 'Markets', 'News & Events'];
+  const tabKeys = ['funds', 'markets', 'news'];
 
   /* Pre-generate chart data for overview */
   const [overviewLH] = useState(() => genPair(12, 0.10, 0.075));
@@ -975,56 +1127,7 @@ function InsightsPage({ onNavigate }) {
       )}
 
       {/* ═══ FUNDS TAB ═══ */}
-      {tab === 'funds' && (
-        <div style={{ flex: 1, padding: isMobile ? '20px 16px' : '28px 60px', background: C.offWhite }}>
-          {[
-            { key: 'short', label: 'Short Term (0–1 Year)', color: C.navyLight, items: fundComparisons.short },
-            { key: 'medium', label: 'Medium Term (1–5 Years)', color: C.navy, items: fundComparisons.medium },
-            { key: 'long', label: 'Long Term (5+ Years)', color: C.navyDark, items: fundComparisons.long },
-          ].map(({ key, label, color: tierColor, items }) => (
-            <div key={key} style={{ marginBottom: 36 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
-                <div style={{ width: 4, height: 24, borderRadius: 2, background: tierColor }} />
-                <h3 style={{ fontFamily: font.serif, fontSize: 18, fontWeight: 700, color: C.gray900 }}>{label}</h3>
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : (items.length === 2 ? '1fr 1fr' : 'repeat(3, 1fr)'), gap: 16 }}>
-                {items.map((comp) => {
-                  const [d1, d2] = genPair(12, comp.lhGrowth, comp.mktGrowth);
-                  const diff = (parseFloat(comp.lhReturn) - parseFloat(comp.mktReturn)).toFixed(1);
-                  return (
-                    <div key={comp.fund} style={{ padding: 20, borderRadius: 14, background: C.white, border: `1px solid ${C.gray100}` }}>
-                      {/* Header */}
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
-                        <div>
-                          <div style={{ fontSize: 14, fontWeight: 700, color: C.gray900, marginBottom: 2 }}>{comp.fund}</div>
-                          <div style={{ fontSize: 11, color: C.gray400 }}>vs {comp.instrument}</div>
-                        </div>
-                        <div style={{ padding: '4px 10px', borderRadius: 6, background: `${C.green}15`, fontSize: 12, fontWeight: 700, color: C.green }}>+{diff}%</div>
-                      </div>
-                      {/* Chart */}
-                      <div style={{ height: 130, marginBottom: 12 }}>
-                        <ComparisonChart data1={d1} data2={d2} label1={comp.fund} label2={comp.instrument} color1={C.red}  width={300} height={120} />
-                      </div>
-                      {/* Returns row */}
-                      <div style={{ display: 'flex', gap: 8 }}>
-                        <div style={{ flex: 1, padding: '8px 10px', borderRadius: 8, background: `${C.red}08`, textAlign: 'center' }}>
-                          <div style={{ fontSize: 10, color: C.gray400, fontWeight: 600, marginBottom: 2 }}>Longhorn</div>
-                          <div style={{ fontSize: 16, fontWeight: 800, color: C.red, fontFamily: font.serif }}>{comp.lhReturn}</div>
-                        </div>
-                        <div style={{ flex: 1, padding: '8px 10px', borderRadius: 8, background: C.gray50, textAlign: 'center' }}>
-                          <div style={{ fontSize: 10, color: C.gray400, fontWeight: 600, marginBottom: 2 }}>Market</div>
-                          <div style={{ fontSize: 16, fontWeight: 800, color: C.gray600, fontFamily: font.serif }}>{comp.mktReturn}</div>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
+      {tab === 'funds' && <FundsTab isMobile={isMobile} />}
 
       {/* ═══ NEWS & EVENTS TAB ═══ */}
       {tab === 'news' && (

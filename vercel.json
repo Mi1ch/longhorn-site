@@ -1,6 +1,14 @@
 {
   "rewrites": [
     {
+      "source": "/api/fund-performance/",
+      "destination": "https://longhorn-api.onrender.com/api/fund-performance/"
+    },
+    {
+      "source": "/api/fund-performance",
+      "destination": "https://longhorn-api.onrender.com/api/fund-performance/"
+    },
+    {
       "source": "/api/foreign-exchange/",
       "destination": "https://longhorn-api.onrender.com/api/foreign-exchange/"
     },
