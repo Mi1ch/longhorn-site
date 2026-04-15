@@ -1,6 +1,14 @@
 {
   "rewrites": [
     {
+      "source": "/api/foreign-exchange/",
+      "destination": "https://longhorn-api.onrender.com/api/foreign-exchange/"
+    },
+    {
+      "source": "/api/foreign-exchange",
+      "destination": "https://longhorn-api.onrender.com/api/foreign-exchange/"
+    },
+    {
       "source": "/api/fund-performance/",
       "destination": "https://longhorn-api.onrender.com/api/fund-performance/"
     },
@@ -9,12 +17,44 @@
       "destination": "https://longhorn-api.onrender.com/api/fund-performance/"
     },
     {
-      "source": "/api/foreign-exchange/",
-      "destination": "https://longhorn-api.onrender.com/api/foreign-exchange/"
+      "source": "/api/fund-performance-benchmark/",
+      "destination": "https://longhorn-api.onrender.com/api/fund-performance-benchmark/"
     },
     {
-      "source": "/api/foreign-exchange",
-      "destination": "https://longhorn-api.onrender.com/api/foreign-exchange/"
+      "source": "/api/fund-performance-benchmark",
+      "destination": "https://longhorn-api.onrender.com/api/fund-performance-benchmark/"
+    },
+    {
+      "source": "/api/all-share-index-benchmark/",
+      "destination": "https://longhorn-api.onrender.com/api/all-share-index-benchmark/"
+    },
+    {
+      "source": "/api/all-share-index-benchmark",
+      "destination": "https://longhorn-api.onrender.com/api/all-share-index-benchmark/"
+    },
+    {
+      "source": "/api/monetary-policyrate-benchmark/",
+      "destination": "https://longhorn-api.onrender.com/api/monetary-policyrate-benchmark/"
+    },
+    {
+      "source": "/api/monetary-policyrate-benchmark",
+      "destination": "https://longhorn-api.onrender.com/api/monetary-policyrate-benchmark/"
+    },
+    {
+      "source": "/api/inflation-rate-benchmark/",
+      "destination": "https://longhorn-api.onrender.com/api/inflation-rate-benchmark/"
+    },
+    {
+      "source": "/api/inflation-rate-benchmark",
+      "destination": "https://longhorn-api.onrender.com/api/inflation-rate-benchmark/"
+    },
+    {
+      "source": "/api/grz-securities-benchmark/",
+      "destination": "https://longhorn-api.onrender.com/api/grz-securities-benchmark/"
+    },
+    {
+      "source": "/api/grz-securities-benchmark",
+      "destination": "https://longhorn-api.onrender.com/api/grz-securities-benchmark/"
     },
     {
       "source": "/api/:path*",
