@@ -29,6 +29,18 @@ const C = {
 const font = { serif: "'Playfair Display',Georgia,serif", sans: "'DM Sans',system-ui,sans-serif" };
 
 /* ═══════════════════════════════════════════ */
+/*  HEADER RIBBON COLOUR                        */
+/*  Change this ONE line to re-theme every page */
+/*  banner/ribbon across the whole site.        */
+/*  Examples to try:                            */
+/*    RED:    `linear-gradient(135deg, ${C.redHover} 0%, ${C.red} 100%)` */
+/*    NAVY:   HEADER_GRADIENT */
+/*    BLACK:  `linear-gradient(135deg, #000 0%, #333 100%)`   */
+/*    GOLD:   `linear-gradient(135deg, #8B6914 0%, ${C.gold} 100%)` */
+/* ═══════════════════════════════════════════ */
+const HEADER_GRADIENT = `linear-gradient(135deg, ${C.redHover} 0%, ${C.red} 100%)`;
+
+/* ═══════════════════════════════════════════ */
 /*  RESPONSIVE HOOK                            */
 /* ═══════════════════════════════════════════ */
 function useIsMobile(breakpoint = 768) {
@@ -111,7 +123,7 @@ function MarketTicker() {
             const yieldStr = yieldVal != null ? `${yieldVal >= 0 ? '+' : ''}${Number(yieldVal).toFixed(2)}%` : null;
             tickerData.push({
               label: row.fund || 'Fund',
-              value: row.price != null ? `K${Number(row.price).toFixed(4)}` : '',
+              value: row.price != null ? `K${Number(row.price).toFixed(2)}` : '',
               yield12: yieldStr,
               isFund: true,
               gain: yieldVal != null ? yieldVal >= 0 : true,
@@ -127,17 +139,19 @@ function MarketTicker() {
         if (fxRows.length > 0) {
           const fxDate = fxRows[0].date || '';
           const fmtFxDate = fxDate ? new Date(fxDate + 'T00:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '';
-          tickerData.push({ label: 'FX Rates vs ZMW', value: fmtFxDate, isLabel: true });
+          tickerData.push({ label: 'Foreign Exchange', value: fmtFxDate, isLabel: true });
 
           fxRows.forEach(row => {
+            /* Skip ZMW — it's always 1:1 against itself */
+            if ((row.currency || '').toUpperCase() === 'ZMW') return;
             const pctChange = row.percentChangeFromPreviousRate;
             const direction = (row.direction || '').toLowerCase();
             const zmwGained = direction.includes('zmw-up') || direction.includes('zmw up');
-            const changeStr = pctChange >= 0 ? `+${pctChange.toFixed(2)}%` : `${pctChange.toFixed(2)}%`;
+            const changeStr = pctChange >= 0 ? `+${Number(pctChange).toFixed(2)}%` : `${Number(pctChange).toFixed(2)}%`;
             tickerData.push({
-              label: `${row.currency}/ZMW`,
+              label: row.currency || 'CUR',
               value: changeStr,
-              rate: row.midRate ? row.midRate.toFixed(2) : null,
+              rate: row.midRate != null ? `K${Number(row.midRate).toFixed(2)}` : null,
               gain: zmwGained,
               isLabel: false,
             });
@@ -162,18 +176,18 @@ function MarketTicker() {
       <style>{`@keyframes tickerScroll { 0% { transform: translateX(0); } 100% { transform: translateX(-33.333%); } }`}</style>
       <div style={{
         display: 'flex', alignItems: 'center', gap: 24, whiteSpace: 'nowrap',
-        animation: 'tickerScroll 35s linear infinite',
+        animation: 'tickerScroll 70s linear infinite',
       }}>
         {tickerItems.map((item, i) => (
           <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             {item.isLabel ? (
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span style={{ fontSize: 12, fontWeight: 700, color: C.white, background: item.label.includes('Fund') ? C.red : C.green, padding: '4px 12px', borderRadius: 4 }}>{item.label}</span>
+                <span style={{ fontSize: 12, fontWeight: 700, color: C.white, background: item.label.includes('Fund') ? C.red : C.green, padding: '4px 12px', borderRadius: 4, letterSpacing: '0.02em' }}>{item.label}</span>
                 {item.value && <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.6)', fontWeight: 500 }}>{item.value}</span>}
               </div>
             ) : item.isFund ? (
               <>
-                <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.75)', fontWeight: 500 }}>{item.label}</span>
+                <span style={{ fontSize: 12.5, color: C.white, fontWeight: 700, letterSpacing: '0.01em' }}>{item.label}</span>
                 <span style={{ fontSize: 13, fontWeight: 700, color: C.white }}>{item.value}</span>
                 {item.yield12 && (
                   <>
@@ -185,7 +199,7 @@ function MarketTicker() {
               </>
             ) : (
               <>
-                <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.75)', fontWeight: 500 }}>{item.label}</span>
+                <span style={{ fontSize: 12.5, color: C.white, fontWeight: 700, letterSpacing: '0.01em' }}>{item.label}</span>
                 {item.rate && <span style={{ fontSize: 13, fontWeight: 700, color: C.white }}>{item.rate}</span>}
                 <div style={{
                   width: 0, height: 0,
@@ -490,7 +504,7 @@ function FundDetailPage({ fundId, onNavigate }) {
     <div style={{ display: 'flex', flexDirection: 'column', minHeight: 'calc(100vh - 64px)' }}>
       {/* Fund header */}
       <div style={{
-        background: `linear-gradient(135deg, ${C.navyDark} 0%, ${C.navy} 100%)`,
+        background: HEADER_GRADIENT,
         padding: isMobile ? '20px 16px' : '28px 60px', display: 'flex', alignItems: 'center', gap: isMobile ? 12 : 20,
       }}>
         <div style={{ width: isMobile ? 40 : 52, height: isMobile ? 40 : 52, borderRadius: 14, background: `${fund.color}30`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -923,42 +937,32 @@ const newsItems = [
 const INSIGHTS_FONT = "'Inter',system-ui,-apple-system,sans-serif";
 
 function FundsTab({ isMobile }) {
-  const [fundRows, setFundRows] = useState(null);
+  const [fundsData, setFundsData] = useState(null); // { fundName: rows[] }
   const [error, setError] = useState(null);
-  const [activeIdx, setActiveIdx] = useState(0);
-  const scrollerRef = useRef(null);
+  const [selectedFund, setSelectedFund] = useState(null); // fund name or null
+  const scrollRef = useRef(null);
 
   useEffect(() => {
     let cancelled = false;
-    fetch('/api/fund-performance/')
+    fetch('/api/fund-performance-benchmark/')
       .then(r => { if (!r.ok) throw new Error(r.status); return r.json(); })
       .then(data => {
         if (cancelled) return;
-        const rows = Array.isArray(data) ? data : data.results || [];
-        setFundRows(rows);
+        if (data && typeof data === 'object' && !Array.isArray(data)) {
+          setFundsData(data);
+        } else {
+          setFundsData({});
+        }
       })
       .catch(err => { if (!cancelled) setError(String(err)); });
     return () => { cancelled = true; };
   }, []);
 
-  /* Scroll to a specific card */
-  const scrollToCard = (idx) => {
-    const el = scrollerRef.current;
+  const scrollByCard = (dir) => {
+    const el = scrollRef.current;
     if (!el) return;
-    const card = el.children[idx];
-    if (card) {
-      el.scrollTo({ left: card.offsetLeft - 12, behavior: 'smooth' });
-      setActiveIdx(idx);
-    }
-  };
-
-  /* Track scroll position to update active dot */
-  const onScroll = () => {
-    const el = scrollerRef.current;
-    if (!el) return;
-    const cardWidth = el.children[0]?.offsetWidth || 1;
-    const idx = Math.round(el.scrollLeft / (cardWidth + 16));
-    setActiveIdx(idx);
+    const cardW = isMobile ? el.clientWidth - 40 : 400;
+    el.scrollBy({ left: dir * cardW, behavior: 'smooth' });
   };
 
   if (error) {
@@ -971,8 +975,7 @@ function FundsTab({ isMobile }) {
       </div>
     );
   }
-
-  if (!fundRows) {
+  if (!fundsData) {
     return (
       <div style={{ flex: 1, padding: isMobile ? '20px 16px' : '28px 60px', background: C.offWhite, fontFamily: INSIGHTS_FONT }}>
         <div style={{ padding: 40, textAlign: 'center', color: C.gray400, fontSize: 14 }}>Loading fund performance…</div>
@@ -980,241 +983,552 @@ function FundsTab({ isMobile }) {
     );
   }
 
+  const fundNames = Object.keys(fundsData);
+  if (fundNames.length === 0) {
+    return (
+      <div style={{ flex: 1, padding: isMobile ? '20px 16px' : '28px 60px', background: C.offWhite, fontFamily: INSIGHTS_FONT }}>
+        <div style={{ padding: 24, color: C.gray500, textAlign: 'center' }}>No fund data available.</div>
+      </div>
+    );
+  }
+
+  // ═══ DETAIL VIEW ═══
+  if (selectedFund && fundsData[selectedFund]) {
+    const rows = (fundsData[selectedFund] || []).slice().sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+    const latest = rows[rows.length - 1] || {};
+    const earliest = rows[0] || {};
+    const fundYield = Number(latest.fundNetAnnualYield) || 0;
+    const bmYield = Number(latest.benchMarkMetric) || 0;
+    const inflation = Number(latest.Inflation) || 0;
+    const outperf = fundYield - bmYield;
+    const realReturn = fundYield - inflation;
+    const fmtDate = (d) => d ? new Date(d + 'T00:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '';
+
+    return (
+      <div style={{ flex: 1, padding: isMobile ? '20px 16px' : '28px 60px', background: C.offWhite, fontFamily: INSIGHTS_FONT }}>
+        {/* Back button */}
+        <button onClick={() => setSelectedFund(null)} style={{
+          display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 14px', borderRadius: 8,
+          background: C.white, border: `1px solid ${C.gray200}`, color: C.gray700, fontSize: 13,
+          fontWeight: 600, cursor: 'pointer', fontFamily: INSIGHTS_FONT, marginBottom: 20,
+        }}
+          onMouseEnter={e => { e.currentTarget.style.background = C.gray50; e.currentTarget.style.borderColor = C.red; e.currentTarget.style.color = C.red; }}
+          onMouseLeave={e => { e.currentTarget.style.background = C.white; e.currentTarget.style.borderColor = C.gray200; e.currentTarget.style.color = C.gray700; }}
+        >
+          <ChevronLeft size={16} /> Back to All Funds
+        </button>
+
+        {/* Performance Summary — top, full width */}
+        <div style={{ padding: '20px 24px', borderRadius: 12, background: C.white, border: `1px solid ${C.gray100}`, marginBottom: 20 }}>
+          <h4 style={{ fontFamily: INSIGHTS_FONT, fontSize: 14, fontWeight: 700, color: C.gray900, marginBottom: 10, letterSpacing: '-0.01em' }}>Performance Summary</h4>
+          <p style={{ fontFamily: INSIGHTS_FONT, fontSize: 13, color: C.gray600, lineHeight: 1.7 }}>
+            Over the period from <b>{fmtDate(earliest.date)}</b> to <b>{fmtDate(latest.date)}</b>, the {selectedFund} has delivered a net annual yield of <b style={{ color: C.red }}>{fundYield.toFixed(2)}%</b>,
+            compared to the {latest.benchMark || 'benchmark'} at <b style={{ color: C.navy }}>{bmYield.toFixed(2)}%</b> — an {outperf >= 0 ? 'outperformance' : 'underperformance'} of <b style={{ color: outperf >= 0 ? C.green : C.red }}>{outperf >= 0 ? '+' : ''}{outperf.toFixed(2)} percentage points</b>.
+            With inflation currently at <b style={{ color: '#E0A500' }}>{inflation.toFixed(2)}%</b>, the fund is delivering a <b style={{ color: realReturn >= 0 ? C.green : C.red }}>{realReturn >= 0 ? 'positive' : 'negative'} real return</b> of {realReturn >= 0 ? '+' : ''}{realReturn.toFixed(2)}% — {realReturn >= 0 ? 'preserving and growing' : 'eroding'} investors' purchasing power.
+          </p>
+        </div>
+
+        {/* Chart + stat cards side by side */}
+        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 220px', gap: 16, marginBottom: 20 }}>
+          {/* Chart card */}
+          <div style={{
+            padding: isMobile ? 16 : 22, borderRadius: 16,
+            background: C.gray50,
+            border: `1px solid ${C.gray200}`,
+            boxShadow: '0 4px 16px rgba(15, 61, 110, 0.08), inset 0 1px 0 rgba(255,255,255,0.6)',
+          }}>
+            <FundBenchmarkChart fundName={selectedFund} rows={rows} isMobile={isMobile} />
+          </div>
+
+          {/* Stat cards — stacked vertically on the right */}
+          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : '1fr', gap: 10 }}>
+            {[
+              { label: 'Fund Yield', value: `${fundYield.toFixed(2)}%`, color: C.red, sub: 'Current period' },
+              { label: latest.benchMark || 'Benchmark', value: `${bmYield.toFixed(2)}%`, color: C.navy, sub: 'Market reference' },
+              { label: 'Inflation', value: `${inflation.toFixed(2)}%`, color: '#E0A500', sub: 'CPI' },
+              { label: 'Real Return', value: `${realReturn >= 0 ? '+' : ''}${realReturn.toFixed(2)}%`, color: realReturn >= 0 ? C.green : C.red, sub: 'Fund − Inflation' },
+            ].map(s => (
+              <div key={s.label} style={{ padding: '12px 14px', borderRadius: 12, background: C.white, border: `1px solid ${C.gray100}` }}>
+                <div style={{ fontSize: 10, color: C.gray400, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 3 }}>{s.label}</div>
+                <div style={{ fontSize: 20, fontWeight: 800, color: s.color, letterSpacing: '-0.02em', lineHeight: 1.1 }}>{s.value}</div>
+                <div style={{ fontSize: 10, color: C.gray400, marginTop: 2 }}>{s.sub}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ═══ LIST VIEW — clickable grid of fund cards ═══
   const fmtDate = (d) => d ? new Date(d + 'T00:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '';
-  const cardWidth = isMobile ? 'calc(100vw - 56px)' : 560;
 
   return (
-    <div style={{ flex: 1, padding: isMobile ? '20px 16px' : '28px 60px', background: C.offWhite, fontFamily: INSIGHTS_FONT, position: 'relative' }}>
+    <div style={{ flex: 1, padding: isMobile ? '20px 16px' : '28px 60px', background: C.offWhite, fontFamily: INSIGHTS_FONT }}>
       <style>{`
-        .funds-scroller::-webkit-scrollbar { height: 6px; }
-        .funds-scroller::-webkit-scrollbar-track { background: ${C.gray50}; border-radius: 3px; }
-        .funds-scroller::-webkit-scrollbar-thumb { background: ${C.gray200}; border-radius: 3px; }
-        .funds-scroller::-webkit-scrollbar-thumb:hover { background: ${C.gray300}; }
+        .funds-hscroll::-webkit-scrollbar { height: 6px; }
+        .funds-hscroll::-webkit-scrollbar-track { background: ${C.gray50}; border-radius: 3px; }
+        .funds-hscroll::-webkit-scrollbar-thumb { background: ${C.gray200}; border-radius: 3px; }
+        .funds-hscroll::-webkit-scrollbar-thumb:hover { background: ${C.gray300}; }
       `}</style>
 
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 20, gap: 16 }}>
-        <div>
-          <h3 style={{ fontFamily: INSIGHTS_FONT, fontSize: isMobile ? 20 : 24, fontWeight: 700, color: C.gray900, marginBottom: 4, letterSpacing: '-0.02em' }}>Longhorn Fund Performance</h3>
-          <p style={{ fontFamily: INSIGHTS_FONT, fontSize: 13, color: C.gray500 }}>Swipe or use the arrows to explore each fund.</p>
-        </div>
-        {!isMobile && (
-          <div style={{ display: 'flex', gap: 8 }}>
-            <button onClick={() => scrollToCard(Math.max(0, activeIdx - 1))} disabled={activeIdx === 0} style={{
-              width: 40, height: 40, borderRadius: '50%', border: `1px solid ${C.gray200}`,
-              background: C.white, cursor: activeIdx === 0 ? 'not-allowed' : 'pointer',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              opacity: activeIdx === 0 ? 0.4 : 1, transition: 'all 0.2s',
-            }}><ChevronLeft size={18} style={{ color: C.gray700 }} /></button>
-            <button onClick={() => scrollToCard(Math.min(fundRows.length - 1, activeIdx + 1))} disabled={activeIdx >= fundRows.length - 1} style={{
-              width: 40, height: 40, borderRadius: '50%', border: `1px solid ${C.gray200}`,
-              background: C.white, cursor: activeIdx >= fundRows.length - 1 ? 'not-allowed' : 'pointer',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              opacity: activeIdx >= fundRows.length - 1 ? 0.4 : 1, transition: 'all 0.2s',
-            }}><ChevronRight size={18} style={{ color: C.gray700 }} /></button>
-          </div>
-        )}
+      <div style={{ marginBottom: 20 }}>
+        <h3 style={{ fontFamily: INSIGHTS_FONT, fontSize: isMobile ? 20 : 24, fontWeight: 700, color: C.gray900, marginBottom: 4, letterSpacing: '-0.02em' }}>Longhorn Fund Performance</h3>
+        <p style={{ fontFamily: INSIGHTS_FONT, fontSize: 13, color: C.gray500 }}>Funds glide automatically — use the arrows or drag to explore. Click any card for its full performance history.</p>
       </div>
 
-      {/* Horizontal scroller */}
-      <div
-        ref={scrollerRef}
-        onScroll={onScroll}
-        className="funds-scroller"
-        style={{
-          display: 'flex', gap: 16, overflowX: 'auto', overflowY: 'hidden',
-          scrollSnapType: 'x mandatory', paddingBottom: 16, scrollBehavior: 'smooth',
-          WebkitOverflowScrolling: 'touch',
-        }}>
-        {fundRows.map((row, idx) => {
-          const yields = [
-            { label: '3 Months', value: Number(row.averageYieldThreeMonths) || 0 },
-            { label: '6 Months', value: Number(row.averageYieldSixMonths) || 0 },
-            { label: '12 Months', value: Number(row.averageYieldTwelveMonths) || 0 },
-          ];
-          const maxY = Math.max(...yields.map(y => Math.abs(y.value)), 1);
-          const price = row.price != null ? Number(row.price).toFixed(4) : '—';
-          const y12 = yields[2].value;
+      <div style={{ position: 'relative' }}>
+        {/* Left arrow */}
+        <button onClick={() => scrollByCard(-1)} aria-label="Scroll left" style={{
+          position: 'absolute', left: isMobile ? 4 : -18, top: '50%', transform: 'translateY(-50%)',
+          width: isMobile ? 36 : 44, height: isMobile ? 36 : 44, borderRadius: '50%', background: C.white,
+          boxShadow: '0 4px 16px rgba(0,0,0,0.12)', border: `1px solid ${C.gray100}`,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          cursor: 'pointer', color: C.gray700, zIndex: 5, transition: 'all 0.2s',
+        }}
+          onMouseEnter={e => { e.currentTarget.style.background = C.red; e.currentTarget.style.color = '#fff'; }}
+          onMouseLeave={e => { e.currentTarget.style.background = C.white; e.currentTarget.style.color = C.gray700; }}
+        ><ChevronLeft size={20} /></button>
+
+        {/* Right arrow */}
+        <button onClick={() => scrollByCard(1)} aria-label="Scroll right" style={{
+          position: 'absolute', right: isMobile ? 4 : -18, top: '50%', transform: 'translateY(-50%)',
+          width: isMobile ? 36 : 44, height: isMobile ? 36 : 44, borderRadius: '50%', background: C.white,
+          boxShadow: '0 4px 16px rgba(0,0,0,0.12)', border: `1px solid ${C.gray100}`,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          cursor: 'pointer', color: C.gray700, zIndex: 5, transition: 'all 0.2s',
+        }}
+          onMouseEnter={e => { e.currentTarget.style.background = C.red; e.currentTarget.style.color = '#fff'; }}
+          onMouseLeave={e => { e.currentTarget.style.background = C.white; e.currentTarget.style.color = C.gray700; }}
+        ><ChevronRight size={20} /></button>
+
+      <div ref={scrollRef} className="funds-hscroll" style={{
+        display: 'flex', gap: 16, overflowX: 'auto', overflowY: 'hidden',
+        scrollSnapType: 'x mandatory', paddingBottom: 16, scrollBehavior: 'smooth',
+        WebkitOverflowScrolling: 'touch',
+      }}>
+        {fundNames.map((fundName) => {
+          const rows = (fundsData[fundName] || []).slice().sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+          if (rows.length === 0) return null;
+          const latest = rows[rows.length - 1];
+          const earliest = rows[0];
+          const fundYield = Number(latest.fundNetAnnualYield) || 0;
+          const bmYield = Number(latest.benchMarkMetric) || 0;
+          const inflation = Number(latest.Inflation) || 0;
+          const outperf = fundYield - bmYield;
+          const realReturn = fundYield - inflation;
+          const startYield = Number(earliest.fundNetAnnualYield) || 0;
+          const yieldChange = fundYield - startYield;
+          const cardWidth = isMobile ? 'calc(100vw - 56px)' : 380;
+
+          // Build latest-period summary sentence
+          const trendWord = yieldChange >= 0.5 ? 'trending upward' : yieldChange <= -0.5 ? 'trending downward' : 'holding steady';
+          const vsBmWord = outperf >= 0 ? `outperforming its ${latest.benchMark || 'benchmark'} by ${outperf.toFixed(2)} pp` : `trailing its ${latest.benchMark || 'benchmark'} by ${Math.abs(outperf).toFixed(2)} pp`;
+          const realWord = realReturn >= 0 ? `beating inflation by ${realReturn.toFixed(2)} pp` : `below inflation by ${Math.abs(realReturn).toFixed(2)} pp`;
 
           return (
-            <div key={row.fund || idx} style={{
-              flex: `0 0 ${cardWidth}`, width: cardWidth,
-              scrollSnapAlign: 'start',
-              padding: isMobile ? 20 : 28, borderRadius: 16, background: C.white,
-              border: `1px solid ${C.gray100}`, boxShadow: '0 2px 12px rgba(0,0,0,0.05)',
-            }}>
-              {/* Header row */}
-              <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', justifyContent: 'space-between', alignItems: isMobile ? 'flex-start' : 'flex-end', gap: 16, marginBottom: 24, paddingBottom: 20, borderBottom: `1px solid ${C.gray100}` }}>
-                <div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
-                    <div style={{ width: 4, height: 22, borderRadius: 2, background: C.red }} />
-                    <h3 style={{ fontFamily: INSIGHTS_FONT, fontSize: isMobile ? 17 : 20, fontWeight: 700, color: C.gray900, letterSpacing: '-0.02em' }}>{row.fund || 'Fund'}</h3>
+            <div
+              key={fundName}
+              onClick={() => setSelectedFund(fundName)}
+              style={{
+                flex: `0 0 ${cardWidth}`, width: cardWidth, scrollSnapAlign: 'start',
+                padding: isMobile ? 18 : 22, borderRadius: 14, background: C.white,
+                border: `1px solid ${C.gray100}`, cursor: 'pointer',
+                transition: 'all 0.2s', boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+              }}
+              onMouseEnter={e => {
+                e.currentTarget.style.transform = 'translateY(-2px)';
+                e.currentTarget.style.boxShadow = '0 8px 24px rgba(0,0,0,0.08)';
+                e.currentTarget.style.borderColor = C.red;
+              }}
+              onMouseLeave={e => {
+                e.currentTarget.style.transform = 'translateY(0)';
+                e.currentTarget.style.boxShadow = '0 1px 3px rgba(0,0,0,0.04)';
+                e.currentTarget.style.borderColor = C.gray100;
+              }}
+            >
+              {/* Header */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14, gap: 12 }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
+                    <div style={{ width: 4, height: 20, borderRadius: 2, background: C.red, flexShrink: 0 }} />
+                    <h3 style={{ fontFamily: INSIGHTS_FONT, fontSize: isMobile ? 15 : 16, fontWeight: 700, color: C.gray900, letterSpacing: '-0.02em', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{fundName}</h3>
                   </div>
-                  <p style={{ fontFamily: INSIGHTS_FONT, fontSize: 12, color: C.gray400, marginLeft: 14 }}>As at {fmtDate(row.date)}</p>
+                  <p style={{ fontFamily: INSIGHTS_FONT, fontSize: 11, color: C.gray400, marginLeft: 14 }}>
+                    As at {fmtDate(latest.date)}
+                  </p>
                 </div>
-                <div style={{ display: 'flex', gap: 10 }}>
-                  <div style={{ padding: '10px 14px', borderRadius: 10, background: C.offWhite, border: `1px solid ${C.gray100}`, minWidth: 100 }}>
-                    <div style={{ fontFamily: INSIGHTS_FONT, fontSize: 10, fontWeight: 600, color: C.gray400, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Unit Price</div>
-                    <div style={{ fontFamily: INSIGHTS_FONT, fontSize: 18, fontWeight: 700, color: C.navy, letterSpacing: '-0.02em' }}>K{price}</div>
-                  </div>
-                  <div style={{ padding: '10px 14px', borderRadius: 10, background: y12 >= 0 ? `${C.green}10` : `${C.red}10`, border: `1px solid ${y12 >= 0 ? `${C.green}30` : `${C.red}30`}`, minWidth: 100 }}>
-                    <div style={{ fontFamily: INSIGHTS_FONT, fontSize: 10, fontWeight: 600, color: C.gray400, textTransform: 'uppercase', letterSpacing: '0.05em' }}>12M Yield</div>
-                    <div style={{ fontFamily: INSIGHTS_FONT, fontSize: 18, fontWeight: 700, color: y12 >= 0 ? C.green : C.red, letterSpacing: '-0.02em' }}>
-                      {y12 >= 0 ? '+' : ''}{y12.toFixed(2)}%
-                    </div>
-                  </div>
+                <div style={{
+                  padding: '4px 10px', borderRadius: 6,
+                  background: outperf >= 0 ? `${C.green}15` : `${C.red}15`,
+                  fontSize: 11, fontWeight: 700,
+                  color: outperf >= 0 ? C.green : C.red,
+                  whiteSpace: 'nowrap',
+                }}>
+                  {outperf >= 0 ? '▲' : '▼'} {outperf >= 0 ? '+' : ''}{outperf.toFixed(2)}%
                 </div>
               </div>
 
-              {/* Yield bars */}
-              <div>
-                <div style={{ fontFamily: INSIGHTS_FONT, fontSize: 11, fontWeight: 600, color: C.gray500, marginBottom: 16, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Average Yield Over Time</div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
-                  {yields.map((y) => {
-                    const pct = (Math.abs(y.value) / maxY) * 100;
-                    const barColor = y.value >= 0 ? C.green : C.red;
-                    return (
-                      <div key={y.label}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 6 }}>
-                          <span style={{ fontFamily: INSIGHTS_FONT, fontSize: 13, fontWeight: 500, color: C.gray700 }}>{y.label}</span>
-                          <span style={{ fontFamily: INSIGHTS_FONT, fontSize: 15, fontWeight: 700, color: barColor, letterSpacing: '-0.01em' }}>
-                            {y.value >= 0 ? '+' : ''}{y.value.toFixed(2)}%
-                          </span>
-                        </div>
-                        <div style={{ position: 'relative', height: 12, background: C.gray50, borderRadius: 6, overflow: 'hidden' }}>
-                          <div style={{
-                            position: 'absolute', top: 0, left: 0, height: '100%',
-                            width: `${pct}%`,
-                            background: `linear-gradient(90deg, ${barColor}, ${barColor}dd)`,
-                            borderRadius: 6,
-                            transition: 'width 0.8s ease',
-                          }} />
-                        </div>
-                      </div>
-                    );
-                  })}
+              {/* Big yield number */}
+              <div style={{ marginBottom: 14 }}>
+                <div style={{ fontSize: 10, fontWeight: 600, color: C.gray400, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Fund Net Annual Yield</div>
+                <div style={{ fontSize: 32, fontWeight: 800, color: C.red, letterSpacing: '-0.02em', lineHeight: 1.1 }}>{fundYield.toFixed(2)}%</div>
+              </div>
+
+              {/* Plain-English summary */}
+              <div style={{
+                padding: '12px 14px', borderRadius: 10, background: C.gray50,
+                border: `1px solid ${C.gray100}`, marginBottom: 12,
+              }}>
+                <p style={{ fontFamily: INSIGHTS_FONT, fontSize: 12, color: C.gray600, lineHeight: 1.6, margin: 0 }}>
+                  The fund is <b style={{ color: C.gray900 }}>{trendWord}</b>, currently <b style={{ color: outperf >= 0 ? C.green : C.red }}>{vsBmWord}</b> and <b style={{ color: realReturn >= 0 ? C.green : C.red }}>{realWord}</b>.
+                </p>
+              </div>
+
+              {/* Comparison row */}
+              <div style={{ display: 'flex', gap: 8, paddingTop: 12, borderTop: `1px solid ${C.gray100}` }}>
+                {[
+                  { label: latest.benchMark || 'Benchmark', value: bmYield, color: C.navy },
+                  { label: 'Inflation', value: inflation, color: '#E0A500' },
+                ].map(s => (
+                  <div key={s.label} style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 10, color: C.gray400, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.label}</div>
+                    <div style={{ fontSize: 14, fontWeight: 700, color: s.color }}>{s.value.toFixed(2)}%</div>
+                  </div>
+                ))}
+                <div style={{ alignSelf: 'center', fontSize: 11, fontWeight: 700, color: C.red, whiteSpace: 'nowrap' }}>
+                  View Details →
                 </div>
               </div>
             </div>
           );
         })}
       </div>
-
-      {/* Dot indicators */}
-      <div style={{ display: 'flex', justifyContent: 'center', gap: 6, marginTop: 12 }}>
-        {fundRows.map((_, i) => (
-          <button key={i} onClick={() => scrollToCard(i)} style={{
-            width: activeIdx === i ? 24 : 8, height: 8,
-            borderRadius: activeIdx === i ? 4 : 50,
-            border: 'none', cursor: 'pointer', padding: 0,
-            background: activeIdx === i ? C.red : C.gray200,
-            transition: 'all 0.3s ease',
-          }} />
-        ))}
       </div>
     </div>
   );
 }
 
 /* ══════════════════════════════════════════════
-   MARKET SNAPSHOT CARDS — includes live USD/ZMW
-   12-month performance card
+   FUND BENCHMARK CHART — 3-line time-series
+   Plots fundNetAnnualYield, benchMarkMetric, Inflation
+   over time using the date as the x-axis
+   ══════════════════════════════════════════════ */
+function FundBenchmarkChart({ fundName, rows, isMobile }) {
+  if (!rows || rows.length === 0) {
+    return <div style={{ padding: 20, color: C.gray400, fontSize: 13 }}>No data for {fundName}</div>;
+  }
+
+  const W = 440;
+  const H = 180;
+  const padL = 38;
+  const padR = 24;
+  const padT = 12;
+  const padB = 30;
+  const innerW = W - padL - padR;
+  const innerH = H - padT - padB;
+
+  const series = [
+    { key: 'fundNetAnnualYield', label: 'Fund Net Annual Yield', color: C.red,       width: 1.6, dash: null },
+    { key: 'benchMarkMetric',    label: rows[0].benchMark || 'Benchmark', color: C.navy, width: 1.4, dash: null },
+    { key: 'Inflation',          label: 'Inflation',           color: '#E0A500',   width: 1.4, dash: '5,4' },
+  ];
+
+  const allValues = rows.flatMap(r => series.map(s => Number(r[s.key])).filter(v => !isNaN(v)));
+  const rawMin = Math.min(...allValues);
+  const rawMax = Math.max(...allValues);
+  const span = rawMax - rawMin || 1;
+  const yMin = Math.max(0, Math.floor((rawMin - span * 0.1) / 5) * 5);
+  const yMax = Math.ceil((rawMax + span * 0.1) / 5) * 5;
+  const yRange = yMax - yMin || 1;
+
+  const xFor = (i) => padL + (rows.length === 1 ? innerW / 2 : (i / (rows.length - 1)) * innerW);
+  const yFor = (v) => padT + innerH - ((v - yMin) / yRange) * innerH;
+
+  /* Straight-line polyline path */
+  const toLinePath = (key) => {
+    const pts = rows.map((r, i) => `${xFor(i)},${yFor(Number(r[key]))}`);
+    return `M ${pts.join(' L ')}`;
+  };
+
+  const yTicks = [0, 0.25, 0.5, 0.75, 1].map(t => yMin + t * yRange);
+
+  const fmtTick = (d) => {
+    if (!d) return '';
+    const dt = new Date(d + 'T00:00:00');
+    return dt.toLocaleDateString('en-GB', { month: 'short', year: '2-digit' });
+  };
+  const tickStep = Math.max(1, Math.ceil(rows.length / 5));
+  const xTickIdx = rows.map((_, i) => i).filter(i => i % tickStep === 0 || i === rows.length - 1);
+
+  return (
+    <div>
+      {/* Header — fund name + date range only */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
+        <div style={{ width: 4, height: 18, borderRadius: 2, background: C.red }} />
+        <h3 style={{ fontFamily: INSIGHTS_FONT, fontSize: isMobile ? 14 : 15, fontWeight: 700, color: C.gray900, letterSpacing: '-0.02em' }}>{fundName}</h3>
+      </div>
+      <p style={{ fontFamily: INSIGHTS_FONT, fontSize: 10, color: C.gray400, marginLeft: 14, marginBottom: 10 }}>
+        {fmtTick(rows[0].date)} → {fmtTick(rows[rows.length - 1].date)}
+      </p>
+
+      {/* SVG chart — straight lines, no hover interaction */}
+      <svg viewBox={`0 0 ${W} ${H}`} width="100%" style={{ display: 'block' }}>
+        {/* Arrow marker defs */}
+        <defs>
+          {series.map(s => (
+            <marker key={s.key} id={`arrow-${s.key}`} viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+              <path d="M 0 0 L 10 5 L 0 10 z" fill={s.color} />
+            </marker>
+          ))}
+        </defs>
+
+        {/* Y grid + labels */}
+        {yTicks.map((v, i) => {
+          const y = yFor(v);
+          return (
+            <g key={i}>
+              <line x1={padL} y1={y} x2={W - padR} y2={y} stroke={C.gray200} strokeWidth="1" strokeDasharray="3,4" />
+              <text x={padL - 5} y={y + 3} textAnchor="end" fontSize="9" fill={C.gray500} fontFamily={INSIGHTS_FONT}>{v.toFixed(0)}%</text>
+            </g>
+          );
+        })}
+
+        {/* X labels */}
+        {xTickIdx.map(i => (
+          <text key={i} x={xFor(i)} y={H - 12} textAnchor="middle" fontSize="8" fill={C.gray500} fontFamily={INSIGHTS_FONT}>
+            {fmtTick(rows[i].date)}
+          </text>
+        ))}
+
+        {/* Series lines — straight segments with arrow markers */}
+        {series.map(s => (
+          <path
+            key={s.key}
+            d={toLinePath(s.key)}
+            fill="none"
+            stroke={s.color}
+            strokeWidth={s.width}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeDasharray={s.dash || undefined}
+            markerEnd={`url(#arrow-${s.key})`}
+          />
+        ))}
+      </svg>
+
+      {/* Legend — centered below chart */}
+      <div style={{ display: 'flex', justifyContent: 'center', flexWrap: 'wrap', gap: 14, marginTop: 8 }}>
+        {series.map(s => (
+          <div key={s.key} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <svg width="18" height="6">
+              <line x1="0" y1="3" x2="18" y2="3" stroke={s.color} strokeWidth={s.width} strokeDasharray={s.dash || undefined} strokeLinecap="round" />
+            </svg>
+            <span style={{ fontFamily: INSIGHTS_FONT, fontSize: 10, fontWeight: 600, color: C.gray600 }}>{s.label}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+
+/* ══════════════════════════════════════════════
+   MARKET SNAPSHOT CARDS — ALL LIVE API DATA
+   2-row horizontal-scrollable, equal-sized cards
+   APIs: foreign-exchange, all-share-index, monetary-policyrate,
+         inflation-rate, grz-securities
    ══════════════════════════════════════════════ */
 function MarketSnapshotCards({ isMobile }) {
-  const [usdRow, setUsdRow] = useState(null);
+  const [cards, setCards] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const scrollRef = useRef(null);
 
   useEffect(() => {
     let cancelled = false;
-    fetch('/api/foreign-exchange/')
-      .then(r => { if (!r.ok) throw new Error(r.status); return r.json(); })
-      .then(data => {
-        if (cancelled) return;
-        const rows = Array.isArray(data) ? data : data.results || [];
-        const usd = rows.find(r => (r.currency || '').toUpperCase() === 'USD');
-        if (usd) setUsdRow(usd);
-      })
-      .catch(() => {});
+    Promise.allSettled([
+      fetch('/api/foreign-exchange/').then(r => { if (!r.ok) throw new Error(r.status); return r.json(); }),
+      fetch('/api/all-share-index-benchmark/').then(r => { if (!r.ok) throw new Error(r.status); return r.json(); }),
+      fetch('/api/monetary-policyrate-benchmark/').then(r => { if (!r.ok) throw new Error(r.status); return r.json(); }),
+      fetch('/api/inflation-rate-benchmark/').then(r => { if (!r.ok) throw new Error(r.status); return r.json(); }),
+      fetch('/api/grz-securities-benchmark/').then(r => { if (!r.ok) throw new Error(r.status); return r.json(); }),
+    ]).then(([fxRes, asiRes, mprRes, infRes, grzRes]) => {
+      if (cancelled) return;
+      const result = [];
+
+      /* USD/ZMW from foreign-exchange */
+      if (fxRes.status === 'fulfilled') {
+        const fxRows = Array.isArray(fxRes.value) ? fxRes.value : fxRes.value.results || [];
+        const usd = fxRows.find(r => (r.currency || '').toUpperCase() === 'USD');
+        if (usd) {
+          const pct12 = Number(usd.percentChangeFrom12monthsAgo) || 0;
+          const zmwUp = pct12 < 0;
+          result.push({
+            label: 'USD / ZMW',
+            value: `K${Number(usd.midRate).toFixed(2)}`,
+            change: `12M ${pct12 >= 0 ? '+' : ''}${pct12.toFixed(2)}%`,
+            negative: !zmwUp,
+            date: usd.date,
+          });
+        }
+        /* Add other FX pairs (exclude ZMW) */
+        fxRows.filter(r => {
+          const cur = (r.currency || '').toUpperCase();
+          return cur !== 'USD' && cur !== 'ZMW';
+        }).forEach(r => {
+          const pct = Number(r.percentChangeFromPreviousRate) || 0;
+          const dir = (r.direction || '').toLowerCase();
+          const zmwGained = dir.includes('zmw-up') || dir.includes('zmw up');
+          result.push({
+            label: `${r.currency} / ZMW`,
+            value: `K${Number(r.midRate).toFixed(2)}`,
+            change: `${pct >= 0 ? '+' : ''}${pct.toFixed(2)}%`,
+            negative: !zmwGained,
+            date: r.date,
+          });
+        });
+      }
+
+      /* LuSE ASI */
+      if (asiRes.status === 'fulfilled') {
+        const d = asiRes.value;
+        const dir = (d.direction || '').toLowerCase();
+        result.push({
+          label: 'LuSE ASI',
+          value: d.allShareIndex != null ? Number(d.allShareIndex).toLocaleString('en', { maximumFractionDigits: 2 }) : '—',
+          change: d.change != null ? `${Number(d.change) >= 0 ? '+' : ''}${Number(d.change).toFixed(2)}%` : '—',
+          negative: dir === 'down',
+          date: d.date,
+        });
+      }
+
+      /* Monetary Policy Rate */
+      if (mprRes.status === 'fulfilled') {
+        const d = mprRes.value;
+        const dir = (d.direction || '').toLowerCase();
+        result.push({
+          label: 'Monetary Policy Rate',
+          value: d.monetaryPolicyRate != null ? `${Number(d.monetaryPolicyRate).toFixed(1)}%` : '—',
+          change: d.change || '—',
+          negative: dir === 'up',
+          date: d.date,
+        });
+      }
+
+      /* Inflation Rate */
+      if (infRes.status === 'fulfilled') {
+        const d = infRes.value;
+        const dir = (d.direction || '').toLowerCase();
+        result.push({
+          label: 'Inflation Rate',
+          value: d.inflation != null ? `${Number(d.inflation).toFixed(1)}%` : '—',
+          change: d.change || '—',
+          negative: dir === 'up',
+          date: d.date,
+        });
+      }
+
+      /* GRZ Securities — one card each */
+      if (grzRes.status === 'fulfilled') {
+        const securities = Array.isArray(grzRes.value) ? grzRes.value : [];
+        const nameMap = {
+          '182-tbill': '182-Day T-Bill',
+          '364-tbill': '364-Day T-Bill',
+          '5-year-bond': '5-Year Bond',
+          '10-year-bond': '10-Year Bond',
+          '2-year-bond': '2-Year Bond',
+          '3-year-bond': '3-Year Bond',
+          '7-year-bond': '7-Year Bond',
+          '15-year-bond': '15-Year Bond',
+          '91-tbill': '91-Day T-Bill',
+        };
+        securities.forEach(s => {
+          const dir = (s.direction || '').toLowerCase();
+          result.push({
+            label: nameMap[s.securityName] || s.securityName,
+            value: s.yieldRate != null ? `${Number(s.yieldRate).toFixed(2)}%` : '—',
+            change: s.change || '—',
+            negative: dir === 'up',
+            date: s.date,
+          });
+        });
+      }
+
+      setCards(result);
+      setLoading(false);
+    });
+
     return () => { cancelled = true; };
   }, []);
 
-  /* Static (non-USD) cards */
-  const staticCards = [
-    { label: 'Inflation Rate', value: '12.3%', change: '+0.2%', negative: true },
-    { label: 'BoZ Policy Rate', value: '12.5%', change: 'Unchanged', negative: false },
-    { label: 'LuSE ASI Daily', value: '+0.34%', change: '+9.4% YTD', negative: false },
-    { label: '10Y Bond Yield', value: '16.8%', change: '+0.3%', negative: true },
-    { label: '91-Day T-Bill', value: '11.2%', change: '-0.1%', negative: false },
-  ];
+  if (loading) {
+    return <div style={{ padding: 40, textAlign: 'center', color: C.gray400, fontSize: 14, fontFamily: INSIGHTS_FONT }}>Loading market data…</div>;
+  }
+  if (cards.length === 0) {
+    return <div style={{ padding: 24, textAlign: 'center', color: C.gray500, fontFamily: INSIGHTS_FONT }}>Unable to load market data.</div>;
+  }
 
-  /* Use live data for USD if available */
-  const usdCurrent = usdRow ? Number(usdRow.midRate).toFixed(4) : '—';
-  const usd12moAgo = usdRow ? Number(usdRow.midRate12monthsAgo).toFixed(4) : '—';
-  const usd12moPct = usdRow ? Number(usdRow.percentChangeFrom12monthsAgo) : 0;
-  /* Negative % = ZMW strengthened vs USD → good for Zambia → show green */
-  const zmwStrengthened = usd12moPct < 0;
+  /* Split into 2 rows for desktop display */
+  const half = Math.ceil(cards.length / 2);
+  const row1 = cards.slice(0, half);
+  const row2 = cards.slice(half);
+
+  const CARD_W = isMobile ? 160 : 190;
+
+  const cardStyle = {
+    flex: `0 0 ${CARD_W}px`, width: CARD_W, padding: '16px 14px', borderRadius: 12,
+    background: C.white, border: `1px solid ${C.gray100}`, scrollSnapAlign: 'start',
+  };
+
+  const renderCard = (c) => (
+    <div key={c.label} style={cardStyle}>
+      <div style={{ fontFamily: INSIGHTS_FONT, fontSize: 10, color: C.gray400, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.label}</div>
+      <div style={{ fontFamily: INSIGHTS_FONT, fontSize: 20, fontWeight: 800, color: C.gray900, letterSpacing: '-0.02em', marginBottom: 4, lineHeight: 1.1 }}>{c.value}</div>
+      <div style={{ fontFamily: INSIGHTS_FONT, fontSize: 11, fontWeight: 600, color: c.negative ? '#DC2626' : C.green }}>{c.change}</div>
+    </div>
+  );
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '2fr 1fr 1fr 1fr 1fr 1fr', gap: 12, fontFamily: INSIGHTS_FONT }}>
-      {/* Expanded USD card — spans 2 columns on desktop */}
-      <div style={{
-        padding: '18px 20px', borderRadius: 12, background: C.white,
-        border: `1px solid ${C.gray100}`, position: 'relative', overflow: 'hidden',
+    <div style={{ position: 'relative' }}>
+      <style>{`
+        .mkt-hscroll::-webkit-scrollbar { height: 5px; }
+        .mkt-hscroll::-webkit-scrollbar-track { background: ${C.gray50}; border-radius: 3px; }
+        .mkt-hscroll::-webkit-scrollbar-thumb { background: ${C.gray200}; border-radius: 3px; }
+      `}</style>
+
+      {/* Left arrow */}
+      <button onClick={() => { const el = scrollRef.current; if (el) el.scrollBy({ left: -CARD_W * 2, behavior: 'smooth' }); }} style={{
+        position: 'absolute', left: isMobile ? 2 : -16, top: '50%', transform: 'translateY(-50%)',
+        width: 36, height: 36, borderRadius: '50%', background: C.white,
+        boxShadow: '0 2px 10px rgba(0,0,0,0.1)', border: `1px solid ${C.gray100}`,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        cursor: 'pointer', color: C.gray700, zIndex: 5,
+      }}><ChevronLeft size={18} /></button>
+
+      {/* Right arrow */}
+      <button onClick={() => { const el = scrollRef.current; if (el) el.scrollBy({ left: CARD_W * 2, behavior: 'smooth' }); }} style={{
+        position: 'absolute', right: isMobile ? 2 : -16, top: '50%', transform: 'translateY(-50%)',
+        width: 36, height: 36, borderRadius: '50%', background: C.white,
+        boxShadow: '0 2px 10px rgba(0,0,0,0.1)', border: `1px solid ${C.gray100}`,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        cursor: 'pointer', color: C.gray700, zIndex: 5,
+      }}><ChevronRight size={18} /></button>
+
+      <div ref={scrollRef} className="mkt-hscroll" style={{
+        overflowX: 'auto', overflowY: 'hidden', scrollSnapType: 'x mandatory',
+        scrollBehavior: 'smooth', WebkitOverflowScrolling: 'touch', paddingBottom: 8,
       }}>
-        {/* Subtle dollar accent */}
-        <div style={{ position: 'absolute', top: -10, right: -10, width: 80, height: 80, borderRadius: '50%', background: `${C.green}08`, pointerEvents: 'none' }} />
-        <div style={{ position: 'relative' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
-            <div>
-              <div style={{ fontFamily: INSIGHTS_FONT, fontSize: 11, color: C.gray400, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>USD / ZMW</div>
-              <div style={{ fontFamily: INSIGHTS_FONT, fontSize: 26, fontWeight: 800, color: C.gray900, letterSpacing: '-0.02em', marginTop: 2 }}>{usdCurrent}</div>
-            </div>
-            <div style={{
-              padding: '4px 10px', borderRadius: 6,
-              background: zmwStrengthened ? `${C.green}15` : `${C.red}15`,
-              fontSize: 11, fontWeight: 700,
-              color: zmwStrengthened ? C.green : C.red,
-              fontFamily: INSIGHTS_FONT,
-            }}>
-              12M {usd12moPct >= 0 ? '+' : ''}{usd12moPct.toFixed(2)}%
-            </div>
+        {/* Row 1 */}
+        <div style={{ display: 'flex', gap: 10, marginBottom: 10 }}>
+          {row1.map(renderCard)}
+        </div>
+        {/* Row 2 */}
+        {row2.length > 0 && (
+          <div style={{ display: 'flex', gap: 10 }}>
+            {row2.map(renderCard)}
           </div>
-
-          {/* 12-month comparison bar */}
-          {usdRow && (
-            <div style={{ marginTop: 14, paddingTop: 14, borderTop: `1px solid ${C.gray100}` }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontFamily: INSIGHTS_FONT, fontSize: 11, color: C.gray500, marginBottom: 6 }}>
-                <span>12 months ago</span>
-                <span>Today</span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10 }}>
-                <span style={{ fontFamily: INSIGHTS_FONT, fontSize: 14, fontWeight: 700, color: C.gray600 }}>K{usd12moAgo}</span>
-                <div style={{ flex: 1, height: 4, background: C.gray100, borderRadius: 2, position: 'relative', overflow: 'hidden' }}>
-                  <div style={{
-                    position: 'absolute', top: 0, left: 0, height: '100%',
-                    width: '100%',
-                    background: `linear-gradient(90deg, ${zmwStrengthened ? C.red : C.green}, ${zmwStrengthened ? C.green : C.red})`,
-                    opacity: 0.6,
-                  }} />
-                </div>
-                <span style={{ fontFamily: INSIGHTS_FONT, fontSize: 14, fontWeight: 700, color: C.navy }}>K{usdCurrent}</span>
-              </div>
-              <div style={{ fontFamily: INSIGHTS_FONT, fontSize: 11, color: C.gray500, marginTop: 8, lineHeight: 1.5 }}>
-                {zmwStrengthened
-                  ? `The Kwacha has strengthened ${Math.abs(usd12moPct).toFixed(1)}% against the US Dollar over the past 12 months.`
-                  : `The Kwacha has weakened ${Math.abs(usd12moPct).toFixed(1)}% against the US Dollar over the past 12 months.`}
-              </div>
-            </div>
-          )}
-        </div>
+        )}
       </div>
-
-      {/* Other cards */}
-      {staticCards.map(({ label, value, change, negative }) => (
-        <div key={label} style={{ padding: '16px 14px', borderRadius: 12, background: C.white, border: `1px solid ${C.gray100}` }}>
-          <div style={{ fontFamily: INSIGHTS_FONT, fontSize: 11, color: C.gray400, fontWeight: 600, marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{label}</div>
-          <div style={{ fontFamily: INSIGHTS_FONT, fontSize: 22, fontWeight: 800, color: C.gray900, letterSpacing: '-0.02em', marginBottom: 4 }}>{value}</div>
-          <div style={{ fontFamily: INSIGHTS_FONT, fontSize: 11, fontWeight: 600, color: negative ? '#DC2626' : C.green }}>{change}</div>
-        </div>
-      ))}
     </div>
   );
 }
@@ -1226,15 +1540,12 @@ function InsightsPage({ onNavigate }) {
   const tabs = ['Funds', 'Markets', 'News & Events'];
   const tabKeys = ['funds', 'markets', 'news'];
 
-  /* Pre-generate chart data for overview */
-  const [overviewLH] = useState(() => genPair(12, 0.10, 0.075));
-
   return (
     <div style={{ display: 'flex', flexDirection: 'column', minHeight: 'calc(100vh - 64px)' }}>
       {/* Ticker above banner */}
       <MarketTicker />
       {/* Header with tabs */}
-      <div style={{ background: `linear-gradient(135deg, ${C.navyDark} 0%, ${C.navy} 100%)`, padding: isMobile ? '24px 20px' : '32px 60px' }}>
+      <div style={{ background: HEADER_GRADIENT, padding: isMobile ? '24px 20px' : '32px 60px' }}>
         <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', justifyContent: 'space-between', alignItems: isMobile ? 'flex-start' : 'flex-end', gap: isMobile ? 16 : 0 }}>
           <div>
             <h1 style={{ fontFamily: INSIGHTS_FONT, fontSize: isMobile ? 22 : 30, fontWeight: 700, color: C.white, marginBottom: 4, letterSpacing: '-0.02em' }}>Insights & Market Data</h1>
@@ -1257,41 +1568,8 @@ function InsightsPage({ onNavigate }) {
       {/* ═══ MARKETS TAB ═══ */}
       {tab === 'markets' && (
         <div style={{ flex: 1, padding: isMobile ? '20px 16px' : '28px 60px', background: C.offWhite, fontFamily: INSIGHTS_FONT }}>
-          {/* Market Snapshot Cards */}
-          <div style={{ marginBottom: 28 }}>
-            <h3 style={{ fontFamily: INSIGHTS_FONT, fontSize: 20, fontWeight: 700, color: C.gray900, marginBottom: 16, letterSpacing: '-0.02em' }}>Market Snapshot</h3>
-            <MarketSnapshotCards isMobile={isMobile} />
-          </div>
-
-          {/* Overall Performance Comparison */}
-          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 280px', gap: 20, marginBottom: 28 }}>
-            <div style={{ padding: 20, borderRadius: 14, background: C.white, border: `1px solid ${C.gray100}` }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-                <div>
-                  <h3 style={{ fontFamily: font.serif, fontSize: 17, fontWeight: 700, color: C.gray900 }}>Longhorn Portfolio vs Market (12M)</h3>
-                  <p style={{ fontSize: 12, color: C.gray400, marginTop: 2 }}>Blended fund performance against weighted market benchmark</p>
-                </div>
-              </div>
-              <div style={{ height: 200 }}>
-                <ComparisonChart data1={overviewLH[0]} data2={overviewLH[1]} label1="Longhorn Blended" label2="Market Benchmark" color1={C.red}  />
-              </div>
-            </div>
-
-            {/* Performance Summary */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-              {[
-                { label: 'Longhorn Avg Return', value: '10.0%', sub: 'Blended across 7 funds', color: C.red },
-                { label: 'Market Benchmark', value: '7.5%', sub: 'Weighted instrument avg', color: C.gray500 },
-                { label: 'Outperformance', value: '+2.5%', sub: 'Alpha generated', color: C.green },
-              ].map(({ label, value, sub, color }) => (
-                <div key={label} style={{ padding: 16, borderRadius: 12, background: C.white, border: `1px solid ${C.gray100}`, flex: 1 }}>
-                  <div style={{ fontSize: 11, color: C.gray400, fontWeight: 600, marginBottom: 4 }}>{label}</div>
-                  <div style={{ fontSize: 26, fontWeight: 800, color, fontFamily: font.serif }}>{value}</div>
-                  <div style={{ fontSize: 11, color: C.gray400, marginTop: 2 }}>{sub}</div>
-                </div>
-              ))}
-            </div>
-          </div>
+          <h3 style={{ fontFamily: INSIGHTS_FONT, fontSize: 20, fontWeight: 700, color: C.gray900, marginBottom: 16, letterSpacing: '-0.02em' }}>Market Snapshot</h3>
+          <MarketSnapshotCards isMobile={isMobile} />
         </div>
       )}
 
@@ -1617,13 +1895,13 @@ function AboutPage({ initialTab }) {
   const [teamTab, setTeamTab] = useState('board');
   const [selectedMember, setSelectedMember] = useState(null);
   const isMobile = useIsMobile();
-  const tabs = [{ k: 'about', l: 'About Us' }, { k: 'governance', l: 'Governance' }, { k: 'team', l: 'Our Team' }, { k: 'values', l: 'Core Values' }];
+  const tabs = [{ k: 'about', l: 'About Us' }, { k: 'team', l: 'Our Team' }, { k: 'governance', l: 'Governance' }, { k: 'values', l: 'Core Values' }];
 
   useEffect(() => { if (initialTab) setTab(initialTab); }, [initialTab]);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', minHeight: 'calc(100vh - 64px)' }}>
-      <div style={{ background: `linear-gradient(135deg, ${C.navyDark} 0%, ${C.navy} 100%)`, padding: isMobile ? '24px 20px' : '32px 60px' }}>
+      <div style={{ background: HEADER_GRADIENT, padding: isMobile ? '24px 20px' : '32px 60px' }}>
         <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', justifyContent: 'space-between', alignItems: isMobile ? 'flex-start' : 'flex-end', gap: isMobile ? 16 : 0 }}>
           <div>
             <h1 style={{ fontFamily: font.serif, fontSize: isMobile ? 22 : 30, fontWeight: 700, color: C.white }}>About Longhorn Associates</h1>
@@ -1675,14 +1953,8 @@ function AboutPage({ initialTab }) {
         {/* Our Team — NEW: Board of Directors + Management */}
         {tab === 'team' && (
           <div>
-            <div style={{ textAlign: 'center', marginBottom: 28 }}>
-              <div style={{ width: 40, height: 3, borderRadius: 2, background: C.red, margin: '0 auto 12px' }} />
-              <h2 style={{ fontFamily: font.serif, fontSize: 24, fontWeight: 700, color: C.gray900, marginBottom: 6 }}>Our People</h2>
-              <p style={{ fontSize: 14, color: C.gray500, maxWidth: 480, margin: '0 auto' }}>Meet the experienced professionals driving Longhorn Associates forward.</p>
-            </div>
-
             {/* Board / Management toggle */}
-            <div style={{ display: 'flex', justifyContent: 'center', gap: 8, marginBottom: 32 }}>
+            <div style={{ display: 'flex', justifyContent: 'center', gap: 8, marginBottom: 24 }}>
               {[{ key: 'board', label: 'Board of Directors' }, { key: 'mgmt', label: 'Management' }].map(t => (
                 <button key={t.key} onClick={() => setTeamTab(t.key)} style={{
                   padding: '10px 28px', borderRadius: 100, fontSize: 14, fontWeight: 600, cursor: 'pointer',
@@ -1769,7 +2041,7 @@ function ContactPage() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', minHeight: 'calc(100vh - 64px)' }}>
-      <div style={{ background: `linear-gradient(135deg, ${C.navyDark} 0%, ${C.navy} 100%)`, padding: isMobile ? '24px 20px' : '32px 60px' }}>
+      <div style={{ background: HEADER_GRADIENT, padding: isMobile ? '24px 20px' : '32px 60px' }}>
         <h1 style={{ fontFamily: font.serif, fontSize: isMobile ? 22 : 30, fontWeight: 700, color: C.white }}>Contact Us</h1>
         <p style={{ fontSize: isMobile ? 12 : 14, color: 'rgba(255,255,255,0.5)', marginTop: 6 }}>Visit any of our 4 branches or get in touch online</p>
       </div>
@@ -1847,7 +2119,7 @@ function PortalPage() {
 
   return (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 'calc(100vh - 64px)', background: C.offWhite, position: 'relative', overflow: 'hidden' }}>
-      <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '40%', background: `linear-gradient(135deg, ${C.navyDark} 0%, ${C.navy} 100%)` }} />
+      <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '40%', background: HEADER_GRADIENT }} />
       <div style={{ position: 'absolute', top: '15%', right: '15%', width: 300, height: 300, borderRadius: '50%', background: 'radial-gradient(circle, rgba(196,30,47,0.12) 0%, transparent 70%)', pointerEvents: 'none' }} />
 
       <div style={{ width: '100%', maxWidth: 440, position: 'relative', zIndex: 1, padding: '0 24px' }}>
@@ -1955,7 +2227,7 @@ function ToolsPage({ onNavigate }) {
     <div style={{ display: 'flex', flexDirection: 'column', minHeight: 'calc(100vh - 64px)' }}>
       <MarketTicker />
       <div style={{
-        background: `linear-gradient(135deg, ${C.navyDark} 0%, ${C.navy} 100%)`,
+        background: HEADER_GRADIENT,
         padding: isMobile ? '24px 20px' : '32px 60px', position: 'relative', overflow: 'hidden',
       }}>
         <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 80,
@@ -2033,7 +2305,7 @@ function ServicesPage({ onNavigate, serviceId }) {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', minHeight: 'calc(100vh - 64px)' }}>
         <MarketTicker />
-        <div style={{ background: `linear-gradient(135deg, ${C.navyDark} 0%, ${C.navy} 100%)`, padding: '32px 60px' }}>
+        <div style={{ background: HEADER_GRADIENT, padding: '32px 60px' }}>
           <button onClick={() => setDetailId(null)} style={{
             display: 'inline-flex', alignItems: 'center', gap: 6, padding: '6px 14px', borderRadius: 6,
             background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.2)',
@@ -2108,7 +2380,7 @@ function ServicesPage({ onNavigate, serviceId }) {
       <MarketTicker />
       {/* Header */}
       <div style={{
-        background: `linear-gradient(135deg, ${C.navyDark} 0%, ${C.navy} 100%)`,
+        background: HEADER_GRADIENT,
         padding: isMobile ? '24px 20px' : '40px 60px', position: 'relative', overflow: 'hidden',
       }}>
         <div style={{
@@ -2253,7 +2525,7 @@ function CareersPage({ onNavigate }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', minHeight: 'calc(100vh - 64px)' }}>
       <MarketTicker />
-      <div style={{ background: `linear-gradient(135deg, ${C.navyDark} 0%, ${C.navy} 100%)`, padding: isMobile ? '24px 20px' : '40px 60px' }}>
+      <div style={{ background: HEADER_GRADIENT, padding: isMobile ? '24px 20px' : '40px 60px' }}>
         <h1 style={{ fontFamily: font.serif, fontSize: isMobile ? 22 : 30, fontWeight: 700, color: C.white }}>Careers at Longhorn</h1>
         <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.5)', marginTop: 6 }}>Join our team and help build Zambia's financial future</p>
       </div>
@@ -2381,7 +2653,6 @@ export default function App() {
       { label: 'Consultancy & Advisory', action: () => navigate('products', 'advisory') },
       { label: 'Risk Management', action: () => navigate('products', 'risk') },
     ]},
-    { label: 'Governance', action: () => navigate('about', null, 'governance') },
     { label: 'Insights', action: () => navigate('insights') },
     { label: 'ROI Calculator', action: () => navigate('tools') },
     { label: 'Careers', action: () => navigate('careers') },
@@ -2408,7 +2679,7 @@ export default function App() {
       }}>
         {/* Logo */}
         <div onClick={() => navigate('home')} style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 10 }}>
-          <img src="/logo.jpeg" alt="Longhorn Associates" style={{ height: isMobile ? 34 : 42, width: 'auto', objectFit: 'contain' }}
+          <img src="/logo.jpeg" alt="Longhorn Associates" style={{ height: isMobile ? 42 : 54, width: 'auto', objectFit: 'contain' }}
             onError={e => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'flex'; }} />
           <div style={{ display: 'none', alignItems: 'center', gap: 3 }}>
             <span style={{ fontFamily: font.serif, fontSize: isMobile ? 18 : 22, fontWeight: 800, color: C.red }}>Longhorn</span>
