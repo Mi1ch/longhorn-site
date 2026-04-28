@@ -56,6 +56,88 @@
       "source": "/api/grz-securities-benchmark",
       "destination": "https://longhorn-api.onrender.com/api/grz-securities-benchmark/"
     },
+
+    {
+      "source": "/api/onboarding/lookups/products/",
+      "destination": "https://longhorn-api.onrender.com/api/onboarding/lookups/products/"
+    },
+    {
+      "source": "/api/onboarding/lookups/products",
+      "destination": "https://longhorn-api.onrender.com/api/onboarding/lookups/products/"
+    },
+    {
+      "source": "/api/onboarding/lookups/applicant-types/",
+      "destination": "https://longhorn-api.onrender.com/api/onboarding/lookups/applicant-types/"
+    },
+    {
+      "source": "/api/onboarding/lookups/applicant-types",
+      "destination": "https://longhorn-api.onrender.com/api/onboarding/lookups/applicant-types/"
+    },
+    {
+      "source": "/api/onboarding/lookups/nationalities/",
+      "destination": "https://longhorn-api.onrender.com/api/onboarding/lookups/nationalities/"
+    },
+    {
+      "source": "/api/onboarding/lookups/nationalities",
+      "destination": "https://longhorn-api.onrender.com/api/onboarding/lookups/nationalities/"
+    },
+    {
+      "source": "/api/onboarding/lookups/genders/",
+      "destination": "https://longhorn-api.onrender.com/api/onboarding/lookups/genders/"
+    },
+    {
+      "source": "/api/onboarding/lookups/genders",
+      "destination": "https://longhorn-api.onrender.com/api/onboarding/lookups/genders/"
+    },
+    {
+      "source": "/api/onboarding/lookups/sales-people/",
+      "destination": "https://longhorn-api.onrender.com/api/onboarding/lookups/sales-people/"
+    },
+    {
+      "source": "/api/onboarding/lookups/sales-people",
+      "destination": "https://longhorn-api.onrender.com/api/onboarding/lookups/sales-people/"
+    },
+    {
+      "source": "/api/onboarding/lookups/funds/",
+      "destination": "https://longhorn-api.onrender.com/api/onboarding/lookups/funds/"
+    },
+    {
+      "source": "/api/onboarding/lookups/funds",
+      "destination": "https://longhorn-api.onrender.com/api/onboarding/lookups/funds/"
+    },
+    {
+      "source": "/api/onboarding/lookups/loan-types/",
+      "destination": "https://longhorn-api.onrender.com/api/onboarding/lookups/loan-types/"
+    },
+    {
+      "source": "/api/onboarding/lookups/loan-types",
+      "destination": "https://longhorn-api.onrender.com/api/onboarding/lookups/loan-types/"
+    },
+    {
+      "source": "/api/onboarding/register/unit-trust/",
+      "destination": "https://longhorn-api.onrender.com/api/onboarding/register/unit-trust/"
+    },
+    {
+      "source": "/api/onboarding/register/unit-trust",
+      "destination": "https://longhorn-api.onrender.com/api/onboarding/register/unit-trust/"
+    },
+    {
+      "source": "/api/onboarding/register/credit-application/",
+      "destination": "https://longhorn-api.onrender.com/api/onboarding/register/credit-application/"
+    },
+    {
+      "source": "/api/onboarding/register/credit-application",
+      "destination": "https://longhorn-api.onrender.com/api/onboarding/register/credit-application/"
+    },
+    {
+      "source": "/api/onboarding/register/stock-broking/",
+      "destination": "https://longhorn-api.onrender.com/api/onboarding/register/stock-broking/"
+    },
+    {
+      "source": "/api/onboarding/register/stock-broking",
+      "destination": "https://longhorn-api.onrender.com/api/onboarding/register/stock-broking/"
+    },
+
     {
       "source": "/api/:path*",
       "destination": "https://longhorn-api.onrender.com/api/:path*"

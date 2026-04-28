@@ -1018,14 +1018,20 @@ function FundsTab({ isMobile }) {
           <ChevronLeft size={16} /> Back to All Funds
         </button>
 
-        {/* Performance Summary — top, full width */}
-        <div style={{ padding: '20px 24px', borderRadius: 12, background: C.white, border: `1px solid ${C.gray100}`, marginBottom: 20 }}>
+        {/* Performance Summary — top, full width, darker background */}
+        <div style={{ padding: '20px 24px', borderRadius: 12, background: '#E8EDF4', border: `1px solid ${C.gray200}`, marginBottom: 20 }}>
           <h4 style={{ fontFamily: INSIGHTS_FONT, fontSize: 14, fontWeight: 700, color: C.gray900, marginBottom: 10, letterSpacing: '-0.01em' }}>Performance Summary</h4>
-          <p style={{ fontFamily: INSIGHTS_FONT, fontSize: 13, color: C.gray600, lineHeight: 1.7 }}>
-            Over the period from <b>{fmtDate(earliest.date)}</b> to <b>{fmtDate(latest.date)}</b>, the {selectedFund} has delivered a net annual yield of <b style={{ color: C.red }}>{fundYield.toFixed(2)}%</b>,
-            compared to the {latest.benchMark || 'benchmark'} at <b style={{ color: C.navy }}>{bmYield.toFixed(2)}%</b> — an {outperf >= 0 ? 'outperformance' : 'underperformance'} of <b style={{ color: outperf >= 0 ? C.green : C.red }}>{outperf >= 0 ? '+' : ''}{outperf.toFixed(2)} percentage points</b>.
-            With inflation currently at <b style={{ color: '#E0A500' }}>{inflation.toFixed(2)}%</b>, the fund is delivering a <b style={{ color: realReturn >= 0 ? C.green : C.red }}>{realReturn >= 0 ? 'positive' : 'negative'} real return</b> of {realReturn >= 0 ? '+' : ''}{realReturn.toFixed(2)}% — {realReturn >= 0 ? 'preserving and growing' : 'eroding'} investors' purchasing power.
-          </p>
+          {outperf >= 0 ? (
+            <p style={{ fontFamily: INSIGHTS_FONT, fontSize: 13, color: C.gray600, lineHeight: 1.7 }}>
+              Over the last 12 months, the {selectedFund} has delivered a net annual yield of <b style={{ color: C.green }}>{fundYield.toFixed(2)}%</b>,
+              compared to the {latest.benchMark || 'benchmark'} at <b style={{ color: C.navy }}>{bmYield.toFixed(2)}%</b> — an outperformance of <b style={{ color: C.green }}>+{outperf.toFixed(2)} percentage points</b>.
+              With inflation currently at <b style={{ color: '#E0A500' }}>{inflation.toFixed(2)}%</b>, the fund is delivering a <b style={{ color: realReturn >= 0 ? C.green : C.red }}>{realReturn >= 0 ? 'positive' : 'negative'} real return</b> of {realReturn >= 0 ? '+' : ''}{realReturn.toFixed(2)}% — {realReturn >= 0 ? 'preserving and growing' : 'eroding'} investors' purchasing power.
+            </p>
+          ) : (
+            <p style={{ fontFamily: INSIGHTS_FONT, fontSize: 13, color: C.gray600, lineHeight: 1.7 }}>
+              Over the last 12 months, the {selectedFund} has delivered a net annual yield of <b style={{ color: C.green }}>{fundYield.toFixed(2)}%</b>.
+            </p>
+          )}
         </div>
 
         {/* Chart + stat cards side by side */}
@@ -1121,6 +1127,11 @@ function FundsTab({ isMobile }) {
           const yieldChange = fundYield - startYield;
           const cardWidth = isMobile ? 'calc(100vw - 56px)' : 380;
 
+          /* Quarter-over-quarter: find the row ~3 months before latest */
+          const prevQIdx = Math.max(0, rows.length - 4);
+          const prevQYield = Number(rows[prevQIdx].fundNetAnnualYield) || 0;
+          const qoqChange = fundYield - prevQYield;
+
           // Build latest-period summary sentence
           const trendWord = yieldChange >= 0.5 ? 'trending upward' : yieldChange <= -0.5 ? 'trending downward' : 'holding steady';
           const vsBmWord = outperf >= 0 ? `outperforming its ${latest.benchMark || 'benchmark'} by ${outperf.toFixed(2)} pp` : `trailing its ${latest.benchMark || 'benchmark'} by ${Math.abs(outperf).toFixed(2)} pp`;
@@ -1160,19 +1171,19 @@ function FundsTab({ isMobile }) {
                 </div>
                 <div style={{
                   padding: '4px 10px', borderRadius: 6,
-                  background: outperf >= 0 ? `${C.green}15` : `${C.red}15`,
+                  background: qoqChange >= 0 ? `${C.green}15` : `${C.red}15`,
                   fontSize: 11, fontWeight: 700,
-                  color: outperf >= 0 ? C.green : C.red,
+                  color: qoqChange >= 0 ? C.green : C.red,
                   whiteSpace: 'nowrap',
                 }}>
-                  {outperf >= 0 ? '▲' : '▼'} {outperf >= 0 ? '+' : ''}{outperf.toFixed(2)}%
+                  {qoqChange >= 0 ? '▲' : '▼'} {qoqChange >= 0 ? '+' : ''}{qoqChange.toFixed(2)}% QoQ
                 </div>
               </div>
 
               {/* Big yield number */}
               <div style={{ marginBottom: 14 }}>
                 <div style={{ fontSize: 10, fontWeight: 600, color: C.gray400, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Fund Net Annual Yield</div>
-                <div style={{ fontSize: 32, fontWeight: 800, color: C.red, letterSpacing: '-0.02em', lineHeight: 1.1 }}>{fundYield.toFixed(2)}%</div>
+                <div style={{ fontSize: 32, fontWeight: 800, color: C.green, letterSpacing: '-0.02em', lineHeight: 1.1 }}>{fundYield.toFixed(2)}%</div>
               </div>
 
               {/* Plain-English summary */}
@@ -1215,16 +1226,19 @@ function FundsTab({ isMobile }) {
    over time using the date as the x-axis
    ══════════════════════════════════════════════ */
 function FundBenchmarkChart({ fundName, rows, isMobile }) {
+  const [hoverIdx, setHoverIdx] = useState(null);
+  const svgRef = useRef(null);
+
   if (!rows || rows.length === 0) {
     return <div style={{ padding: 20, color: C.gray400, fontSize: 13 }}>No data for {fundName}</div>;
   }
 
-  const W = 440;
-  const H = 180;
-  const padL = 38;
-  const padR = 24;
-  const padT = 12;
-  const padB = 30;
+  const W = 380;
+  const H = 150;
+  const padL = 34;
+  const padR = 20;
+  const padT = 10;
+  const padB = 26;
   const innerW = W - padL - padR;
   const innerH = H - padT - padB;
 
@@ -1245,7 +1259,6 @@ function FundBenchmarkChart({ fundName, rows, isMobile }) {
   const xFor = (i) => padL + (rows.length === 1 ? innerW / 2 : (i / (rows.length - 1)) * innerW);
   const yFor = (v) => padT + innerH - ((v - yMin) / yRange) * innerH;
 
-  /* Straight-line polyline path */
   const toLinePath = (key) => {
     const pts = rows.map((r, i) => `${xFor(i)},${yFor(Number(r[key]))}`);
     return `M ${pts.join(' L ')}`;
@@ -1261,9 +1274,21 @@ function FundBenchmarkChart({ fundName, rows, isMobile }) {
   const tickStep = Math.max(1, Math.ceil(rows.length / 5));
   const xTickIdx = rows.map((_, i) => i).filter(i => i % tickStep === 0 || i === rows.length - 1);
 
+  const handleMove = (e) => {
+    const svg = svgRef.current;
+    if (!svg) return;
+    const rect = svg.getBoundingClientRect();
+    const x = ((e.clientX - rect.left) / rect.width) * W;
+    const relX = x - padL;
+    if (relX < 0 || relX > innerW) { setHoverIdx(null); return; }
+    const idx = rows.length === 1 ? 0 : Math.round((relX / innerW) * (rows.length - 1));
+    setHoverIdx(Math.max(0, Math.min(rows.length - 1, idx)));
+  };
+  const handleLeave = () => setHoverIdx(null);
+  const hover = hoverIdx != null ? rows[hoverIdx] : null;
+
   return (
     <div>
-      {/* Header — fund name + date range only */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
         <div style={{ width: 4, height: 18, borderRadius: 2, background: C.red }} />
         <h3 style={{ fontFamily: INSIGHTS_FONT, fontSize: isMobile ? 14 : 15, fontWeight: 700, color: C.gray900, letterSpacing: '-0.02em' }}>{fundName}</h3>
@@ -1272,52 +1297,75 @@ function FundBenchmarkChart({ fundName, rows, isMobile }) {
         {fmtTick(rows[0].date)} → {fmtTick(rows[rows.length - 1].date)}
       </p>
 
-      {/* SVG chart — straight lines, no hover interaction */}
-      <svg viewBox={`0 0 ${W} ${H}`} width="100%" style={{ display: 'block' }}>
-        {/* Arrow marker defs */}
-        <defs>
-          {series.map(s => (
-            <marker key={s.key} id={`arrow-${s.key}`} viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
-              <path d="M 0 0 L 10 5 L 0 10 z" fill={s.color} />
-            </marker>
+      <div style={{ position: 'relative' }}>
+        <svg ref={svgRef} viewBox={`0 0 ${W} ${H}`} width="100%" style={{ display: 'block' }} onMouseMove={handleMove} onMouseLeave={handleLeave}>
+          <defs>
+            {series.map(s => (
+              <marker key={s.key} id={`arrow-${s.key}`} viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                <path d="M 0 0 L 10 5 L 0 10 z" fill={s.color} />
+              </marker>
+            ))}
+          </defs>
+
+          {yTicks.map((v, i) => {
+            const y = yFor(v);
+            return (
+              <g key={i}>
+                <line x1={padL} y1={y} x2={W - padR} y2={y} stroke={C.gray100} strokeWidth="0.5" strokeDasharray="3,4" />
+                <text x={padL - 5} y={y + 3} textAnchor="end" fontSize="9" fill={C.gray500} fontFamily={INSIGHTS_FONT}>{v.toFixed(0)}%</text>
+              </g>
+            );
+          })}
+
+          {xTickIdx.map(i => (
+            <text key={i} x={xFor(i)} y={H - 12} textAnchor="middle" fontSize="8" fill={C.gray500} fontFamily={INSIGHTS_FONT}>
+              {fmtTick(rows[i].date)}
+            </text>
           ))}
-        </defs>
 
-        {/* Y grid + labels */}
-        {yTicks.map((v, i) => {
-          const y = yFor(v);
-          return (
-            <g key={i}>
-              <line x1={padL} y1={y} x2={W - padR} y2={y} stroke={C.gray200} strokeWidth="1" strokeDasharray="3,4" />
-              <text x={padL - 5} y={y + 3} textAnchor="end" fontSize="9" fill={C.gray500} fontFamily={INSIGHTS_FONT}>{v.toFixed(0)}%</text>
-            </g>
-          );
-        })}
+          {series.map(s => (
+            <path key={s.key} d={toLinePath(s.key)} fill="none" stroke={s.color} strokeWidth={s.width} strokeLinecap="round" strokeLinejoin="round" strokeDasharray={s.dash || undefined} markerEnd={`url(#arrow-${s.key})`} />
+          ))}
 
-        {/* X labels */}
-        {xTickIdx.map(i => (
-          <text key={i} x={xFor(i)} y={H - 12} textAnchor="middle" fontSize="8" fill={C.gray500} fontFamily={INSIGHTS_FONT}>
-            {fmtTick(rows[i].date)}
-          </text>
-        ))}
+          {hover && (
+            <>
+              <line x1={xFor(hoverIdx)} y1={padT} x2={xFor(hoverIdx)} y2={padT + innerH} stroke={C.gray300} strokeWidth="0.5" strokeDasharray="3,3" />
+              {series.map(s => {
+                const v = Number(hover[s.key]);
+                if (isNaN(v)) return null;
+                return <circle key={s.key} cx={xFor(hoverIdx)} cy={yFor(v)} r="3.5" fill={s.color} stroke="#fff" strokeWidth="1.5" />;
+              })}
+            </>
+          )}
+        </svg>
 
-        {/* Series lines — straight segments with arrow markers */}
-        {series.map(s => (
-          <path
-            key={s.key}
-            d={toLinePath(s.key)}
-            fill="none"
-            stroke={s.color}
-            strokeWidth={s.width}
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeDasharray={s.dash || undefined}
-            markerEnd={`url(#arrow-${s.key})`}
-          />
-        ))}
-      </svg>
+        {hover && (
+          <div style={{
+            position: 'absolute', top: 6,
+            left: hoverIdx > rows.length / 2 ? 10 : 'auto',
+            right: hoverIdx > rows.length / 2 ? 'auto' : 10,
+            background: C.white, border: `1px solid ${C.gray200}`, borderRadius: 8,
+            padding: '8px 10px', boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
+            fontFamily: INSIGHTS_FONT, fontSize: 10, minWidth: 160, pointerEvents: 'none',
+          }}>
+            <div style={{ fontWeight: 700, color: C.gray900, marginBottom: 4 }}>{fmtTick(hover.date)}</div>
+            {series.map(s => {
+              const v = Number(hover[s.key]);
+              if (isNaN(v)) return null;
+              return (
+                <div key={s.key} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 2 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                    <div style={{ width: 8, height: 3, background: s.color, borderRadius: 1 }} />
+                    <span style={{ color: C.gray600 }}>{s.label}</span>
+                  </div>
+                  <span style={{ fontWeight: 700, color: s.color }}>{v.toFixed(2)}%</span>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
 
-      {/* Legend — centered below chart */}
       <div style={{ display: 'flex', justifyContent: 'center', flexWrap: 'wrap', gap: 14, marginTop: 8 }}>
         {series.map(s => (
           <div key={s.key} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -1473,20 +1521,57 @@ function MarketSnapshotCards({ isMobile }) {
   const row1 = cards.slice(0, half);
   const row2 = cards.slice(half);
 
-  const CARD_W = isMobile ? 160 : 190;
+  const CARD_W = isMobile ? 175 : 220;
 
-  const cardStyle = {
-    flex: `0 0 ${CARD_W}px`, width: CARD_W, padding: '16px 14px', borderRadius: 12,
-    background: C.white, border: `1px solid ${C.gray100}`, scrollSnapAlign: 'start',
+  const renderCard = (c) => {
+    const isUp = !c.negative;
+    const accentColor = isUp ? C.green : '#DC2626';
+    const bgTint = isUp ? 'rgba(22,163,74,0.04)' : 'rgba(220,38,38,0.04)';
+    return (
+      <div key={c.label} style={{
+        flex: `0 0 ${CARD_W}px`, width: CARD_W, padding: '18px 16px', borderRadius: 14,
+        background: C.white, border: `1px solid ${C.gray100}`, scrollSnapAlign: 'start',
+        position: 'relative', overflow: 'hidden',
+      }}>
+        {/* Subtle colored corner accent */}
+        <div style={{ position: 'absolute', top: -12, right: -12, width: 56, height: 56, borderRadius: '50%', background: bgTint, pointerEvents: 'none' }} />
+
+        {/* Label row with direction indicator */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10, position: 'relative' }}>
+          <div style={{ fontFamily: INSIGHTS_FONT, fontSize: 10, color: C.gray400, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>{c.label}</div>
+          {/* Direction arrow circle */}
+          <div style={{
+            width: 24, height: 24, borderRadius: '50%',
+            background: `${accentColor}12`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+          }}>
+            <div style={{
+              width: 0, height: 0,
+              borderLeft: '4px solid transparent', borderRight: '4px solid transparent',
+              borderBottom: isUp ? `6px solid ${accentColor}` : 'none',
+              borderTop: !isUp ? `6px solid ${accentColor}` : 'none',
+            }} />
+          </div>
+        </div>
+
+        {/* Value */}
+        <div style={{ fontFamily: INSIGHTS_FONT, fontSize: 22, fontWeight: 800, color: C.gray900, letterSpacing: '-0.02em', marginBottom: 6, lineHeight: 1.1 }}>{c.value}</div>
+
+        {/* Change badge */}
+        <div style={{
+          display: 'inline-flex', alignItems: 'center', gap: 4,
+          padding: '3px 8px', borderRadius: 6,
+          background: `${accentColor}10`,
+          fontFamily: INSIGHTS_FONT, fontSize: 11, fontWeight: 700, color: accentColor,
+        }}>
+          <span style={{ fontSize: 9 }}>{isUp ? '▲' : '▼'}</span>
+          {c.change}
+        </div>
+
+        {/* Subtle bottom accent bar */}
+        <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 3, background: `linear-gradient(90deg, ${accentColor}40, transparent)` }} />
+      </div>
+    );
   };
-
-  const renderCard = (c) => (
-    <div key={c.label} style={cardStyle}>
-      <div style={{ fontFamily: INSIGHTS_FONT, fontSize: 10, color: C.gray400, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.label}</div>
-      <div style={{ fontFamily: INSIGHTS_FONT, fontSize: 20, fontWeight: 800, color: C.gray900, letterSpacing: '-0.02em', marginBottom: 4, lineHeight: 1.1 }}>{c.value}</div>
-      <div style={{ fontFamily: INSIGHTS_FONT, fontSize: 11, fontWeight: 600, color: c.negative ? '#DC2626' : C.green }}>{c.change}</div>
-    </div>
-  );
 
   return (
     <div style={{ position: 'relative' }}>
@@ -1621,19 +1706,19 @@ function InsightsPage({ onNavigate }) {
 const boardOfDirectors = [
   { name: 'Chanda HJ Chileshe', role: 'Chairman', photo: '/images/team/ChandaChileshe.jpg', initials: 'CC', bio: 'Chanda is a seasoned lawyer and Managing Partner of Lloyd Jones & Collins with over 35 years experience in commercial and legal practice both locally and internationally. He holds a Bachelor of Arts – Joint Hons. in Law & Economics from the University of Keele as well as a Master of Laws Degree, LLM: Taxation, Insurance, Company Law from the University of London. He is a member of various professional bodies and has sat on various Boards including Finance Bank (Atlas Mara), Colgate Palmolive and the Revenue Appeals Tribunal, among others.' },
   { name: 'Banji Gideon Moono', role: 'Director, CFA', photo: '/images/team/BanjiMoono.jpeg', initials: 'BM', bio: 'Banji is a qualified and experienced Finance, Accounting, and Investment professional with extensive experience in Banking and Investments. He has served in senior management positions with various commercial banks including Finance Bank and most recently, the United Bank for Africa where he is currently serving as the Group Head-Investor Relations based in Nigeria. Banji is a qualified Chartered Management Accountant (CIMA) and holder of the prestigious CFA Charter. He holds a Diploma in Treasury Management and is also a fellow of the Zambia Institute of Chartered Accountants (ZICA).' },
-  { name: 'Dionysius Makunka', role: 'CEO, CFA', photo: '/images/team/DionysusMakunka.jpg', initials: 'DM', bio: 'Dionysius is a qualified and experienced Economics and Finance professional with over twenty (20) years of practice with various institutions. He spent about twenty years at the Bank of Zambia where he served in senior management positions prior to going into private practice. He has also been involved in lecturing at the University of Zambia (Derivatives), ZIBFS (Investment Analysis & Portfolio Management) and the University of Lusaka (Risk Management). Dionysius is a Chartered Accountant (ACCA) and holds the prestigious CFA Charter. He also holds the Bachelor of Accountancy degree from the Copperbelt University as well as a Master of Science in Finance & Economics from Manchester University, UK.' },
+  { name: 'Dionysius Makunka', role: 'CEO, CFA', photo: '/images/team/DionysiusMakunka.jpg', initials: 'DM', bio: 'Dionysius is a qualified and experienced Economics and Finance professional with over twenty (20) years of practice with various institutions. He spent about twenty years at the Bank of Zambia where he served in senior management positions prior to going into private practice. He has also been involved in lecturing at the University of Zambia (Derivatives), ZIBFS (Investment Analysis & Portfolio Management) and the University of Lusaka (Risk Management). Dionysius is a Chartered Accountant (ACCA) and holds the prestigious CFA Charter. He also holds the Bachelor of Accountancy degree from the Copperbelt University as well as a Master of Science in Finance & Economics from Manchester University, UK.' },
   { name: 'Namucana Musiwa', role: 'Director', photo: '/images/team/NamucanaMusiwa.jpg', initials: 'NM', bio: 'Namucana is an entrepreneur with extensive experience in governance and talent acquisition. She is the founder and CEO of Career Prospects Limited, one of the leading recruitment agencies in Zambia. She has served and continues to serve on various Boards including the Zambia Qualification Authority, Zambia Institute of Human Resources Management, Professional Insurance Corporation and the University of Zambia Council, Bank of Zambia REMCO, Zambia National Building Society REMCO, among others. Namucana holds a Bachelor of Arts in Public Administration and Economics obtained from the University of Zambia.' },
-  { name: 'Andrew John Kangwa', role: 'Investment Committee Member', photo: null, initials: 'AK', bio: 'Andrew is an experienced finance professional and entrepreneur. Having spent several years working in the Finance division of mining group, First Quantum Mining Plc, he set up private enterprises focused on diversified sectors. Among other qualifications, he holds a Master of Business Administration (MBA).' },
-  { name: 'Pathias Paupila', role: 'Director', photo: null, initials: 'PP', bio: 'Pathias is a qualified and experienced Legal, Credit, Risk and Compliance professional with extensive exposure to managing complex risk processes gained in several institutions for over 18 years. He possesses extensive experience in the allocation of capital to Small and Medium Enterprises (SMEs). Pathias also Chairs the Risk and Compliance Committee of Longhorn Associates Limited. He holds a Master of Science degree in Risk Management, a Bachelor of Laws degree and a Bachelor of Business Administration degree.' },
+  { name: 'Andrew John Kangwa', role: 'Investment Committee Member', photo: '/images/team/Andrew.jpeg', initials: 'AK', bio: 'Andrew is an experienced finance professional and entrepreneur. Having spent several years working in the Finance division of mining group, First Quantum Mining Plc, he set up private enterprises focused on diversified sectors. Among other qualifications, he holds a Master of Business Administration (MBA).' },
+  { name: 'Pathias Paupila', role: 'Director', photo: '/images/team/Pathius.jpeg', initials: 'PP', bio: 'Pathias is a qualified and experienced Legal, Credit, Risk and Compliance professional with extensive exposure to managing complex risk processes gained in several institutions for over 18 years. He possesses extensive experience in the allocation of capital to Small and Medium Enterprises (SMEs). Pathias also Chairs the Risk and Compliance Committee of Longhorn Associates Limited. He holds a Master of Science degree in Risk Management, a Bachelor of Laws degree and a Bachelor of Business Administration degree.' },
 ];
 
 const managementTeam = [
-  { name: 'Dionysius Makunka', role: 'CEO, CFA', photo: '/images/team/DionysusMakunka.jpg', initials: 'DM', bio: 'Dionysius is a qualified and experienced Economics and Finance professional with over twenty (20) years of practice with various institutions. He spent about twenty years at the Bank of Zambia where he served in senior management positions prior to going into private practice. Dionysius is a Chartered Accountant (ACCA) and holds the prestigious CFA Charter.' },
+  { name: 'Dionysius Makunka', role: 'CEO, CFA', photo: '/images/team/DionysiusMakunka.jpg', initials: 'DM', bio: 'Dionysius is a qualified and experienced Economics and Finance professional with over twenty (20) years of practice with various institutions. He spent about twenty years at the Bank of Zambia where he served in senior management positions prior to going into private practice. Dionysius is a Chartered Accountant (ACCA) and holds the prestigious CFA Charter.' },
   { name: 'Brian Chilufya Chintu', role: 'Chief Investments & Operations Officer', photo: '/images/team/BrianChilufyaChintu.JPG', initials: 'BC', bio: 'Brian is a qualified and experienced Finance and Investments professional with experience in management of assorted investment portfolios including Pension Funds and Collective Investments. He has specialized in Investments during his time with the Madison Group where he served in various portfolios in Finance and Investments. More recently he served as Commercial Services Director at Zambia Airports Corporation. He comes with a wealth of experience with particular focus in Corporate Finance, Investments and Accounting.' },
   { name: 'Marlon Nsofu', role: 'Chief Systems & Data Analytics Officer', photo: '/images/team/MarlonNsofu.jpg', initials: 'MN', bio: 'Marlon is an investment professional with over fourteen years of experience in managing pension funds and collective investment schemes. His expertise spans across money markets, capital markets, and other key economic sectors. He has earned certifications in computer science and data science, which he leverages to enhance his work in quantitative finance and financial engineering. He holds a bachelor\'s degree in finance from the Robert H. Smith School of Business at the University of Maryland, USA.' },
   { name: 'Izukanji Nachiza Mwanza', role: 'CFO', photo: '/images/team/IzukanjiMwanza.jpg', initials: 'IM', bio: 'Izukanji started her accounting career with AMO Chartered Accountants in 2011 where she worked as a Management Trainee. She later worked at various institutions in the Finance and Accounting role. Prior to her accounting career, she pursued a diploma in Chemical Engineering at the Copperbelt University. Izukanji is a Chartered Accountant and holder of the ACCA qualification. She is also a member of both ACCA and ZICA.' },
   { name: 'Lewis Mwale', role: 'Chief Partnerships Officer', photo: '/images/team/lewis.jpg', initials: 'LM', bio: 'Lewis is a qualified Social Security Expert and Financial Advisor with over 7 years work experience in the Pensions Industry in Zambia. He holds a Bachelor\'s Degree in Business Administration from the Copperbelt University and is currently pursuing a Master of Business Administration (MBA) - Finance. Prior to joining Longhorn, Lewis worked as a Financial Controller for Innscor Zambia Limited and as a Credit and Debt Analyst for Vision Fund Zambia.' },
-  { name: 'Patrick Edward Zulu', role: 'Chief Credit Operations & Fintech Officer', photo: null, initials: 'PZ', bio: 'Patrick is a seasoned Certified Credit Professional and management specialist with a proven record of building and leading diverse teams. He holds an MBA in Accounting and Finance from the University of Liverpool and a BA with a bias in Economics from the University of Zambia. With more than 18 years of experience, Patrick has worked across credit risk, strategic planning, human resource management and change management at leading institutions including Bayport Financial Services and Micro Finance Zambia Limited.' },
+  { name: 'Patrick Edward Zulu', role: 'Chief Credit Operations & Fintech Officer', photo: '/images/team/Patrick.jpeg', initials: 'PZ', bio: 'Patrick is a seasoned Certified Credit Professional and management specialist with a proven record of building and leading diverse teams. He holds an MBA in Accounting and Finance from the University of Liverpool and a BA with a bias in Economics from the University of Zambia. With more than 18 years of experience, Patrick has worked across credit risk, strategic planning, human resource management and change management at leading institutions including Bayport Financial Services and Micro Finance Zambia Limited.' },
 ];
 
 /* ── Team Member Card ── */
@@ -2107,116 +2192,550 @@ function ContactPage() {
 }
 
 /* ═══════════════════════════════════════════ */
-/*  PORTAL PAGE                               */
+/*  PORTAL PAGE — Login + Onboarding Wizard    */
+/*  7 lookup APIs, 3 products, 2 applicant     */
+/*  types, FormData with bracket notation      */
 /* ═══════════════════════════════════════════ */
+
+/* ── Shared form styles ── */
+const portalStyles = {
+  input: { width: '100%', padding: '10px 14px', borderRadius: 8, border: `1.5px solid ${C.gray200}`, fontSize: 13, fontFamily: font.sans, outline: 'none', color: C.gray800, background: C.white },
+  label: { display: 'block', fontSize: 11, fontWeight: 600, color: C.gray600, marginBottom: 4 },
+  section: { marginBottom: 20 },
+  grid2: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 },
+};
+
 function PortalPage() {
   const [tab, setTab] = useState('login');
-  const [step, setStep] = useState(1);
-  const iS = { width: '100%', padding: '11px 14px', borderRadius: 8, border: `1.5px solid ${C.gray200}`, fontSize: 14, fontFamily: font.sans, outline: 'none', color: C.gray800, background: C.white };
-  const lS = { display: 'block', fontSize: 12, fontWeight: 600, color: C.gray600, marginBottom: 5 };
-  const fH = e => e.target.style.borderColor = C.red;
-  const bH = e => e.target.style.borderColor = C.gray200;
+  const isMobile = useIsMobile();
 
   return (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 'calc(100vh - 64px)', background: C.offWhite, position: 'relative', overflow: 'hidden' }}>
-      <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '40%', background: HEADER_GRADIENT }} />
-      <div style={{ position: 'absolute', top: '15%', right: '15%', width: 300, height: 300, borderRadius: '50%', background: 'radial-gradient(circle, rgba(196,30,47,0.12) 0%, transparent 70%)', pointerEvents: 'none' }} />
-
-      <div style={{ width: '100%', maxWidth: 440, position: 'relative', zIndex: 1, padding: '0 24px' }}>
-        <div style={{ textAlign: 'center', marginBottom: 24 }}>
-          <div style={{ fontFamily: font.serif, fontSize: 28, fontWeight: 800, color: C.white, marginBottom: 6 }}>
-            <span style={{ color: C.red }}>SIMP</span> Invest
-          </div>
-          <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)' }}>Secure Investor Management Portal</p>
+    <div style={{ display: 'flex', flexDirection: 'column', minHeight: 'calc(100vh - 64px)', background: C.offWhite }}>
+      {/* Header */}
+      <div style={{ background: HEADER_GRADIENT, padding: isMobile ? '24px 20px' : '32px 60px', textAlign: 'center' }}>
+        <div style={{ fontFamily: font.serif, fontSize: 26, fontWeight: 800, color: C.white, marginBottom: 4 }}>
+          <span style={{ color: '#FFD0D5' }}>SIMP</span> Invest
         </div>
-
-        <div style={{ background: C.white, borderRadius: 16, padding: 32, boxShadow: '0 20px 60px rgba(0,0,0,0.15)' }}>
-          <div style={{ display: 'flex', background: C.gray50, borderRadius: 10, padding: 3, marginBottom: 24 }}>
-            {['login', 'register'].map(t => (
-              <button key={t} onClick={() => { setTab(t); setStep(1); }} style={{
-                flex: 1, padding: '10px 0', borderRadius: 8, border: 'none', cursor: 'pointer',
-                fontFamily: font.sans, fontWeight: 600, fontSize: 14,
-                background: tab === t ? C.navy : 'transparent',
-                color: tab === t ? C.white : C.gray400,
-              }}>{t === 'login' ? 'Sign In' : 'Register'}</button>
-            ))}
-          </div>
-
-          {tab === 'login' ? (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 16, textAlign: 'center', padding: '20px 0' }}>
-              <div style={{ width: 64, height: 64, borderRadius: '50%', background: `${C.navy}12`, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto' }}>
-                <LogIn size={28} style={{ color: C.navy }} />
-              </div>
-              <h3 style={{ fontFamily: font.serif, fontSize: 20, fontWeight: 700, color: C.gray900 }}>Sign In to Your Account</h3>
-              <p style={{ fontSize: 14, color: C.gray500, lineHeight: 1.6 }}>Access your SIMP Invest portal to manage your investments, track performance, and view your portfolio.</p>
-              <a href="https://online.longhorn-associates.com/auth/login" target="_blank" rel="noopener noreferrer" style={{
-                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-                width: '100%', padding: '14px 0', background: C.red, color: C.white,
-                fontWeight: 700, fontSize: 14, borderRadius: 8, textDecoration: 'none',
-                fontFamily: font.sans, transition: 'all 0.2s',
-              }}
-                onMouseEnter={e => e.currentTarget.style.background = C.redHover}
-                onMouseLeave={e => e.currentTarget.style.background = C.red}
-              >
-                <LogIn size={16} /> Sign In to SIMP Invest
-              </a>
-              <p style={{ fontSize: 12, color: C.gray400 }}>You will be redirected to the secure login portal</p>
-            </div>
-          ) : (
-            <>
-              <div style={{ display: 'flex', gap: 4, marginBottom: 20 }}>
-                {[1, 2, 3].map(s => (<div key={s} style={{ flex: 1, height: 3, borderRadius: 2, background: s <= step ? C.red : C.gray200 }} />))}
-              </div>
-              <h3 style={{ fontFamily: font.serif, fontSize: 17, color: C.gray900, marginBottom: 3 }}>
-                {step === 1 ? 'Personal Details' : step === 2 ? 'Investment Profile' : 'Upload Documents'}
-              </h3>
-              <p style={{ fontSize: 12, color: C.gray400, marginBottom: 18 }}>Step {step} of 3</p>
-
-              {step === 1 && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-                    {['First Name', 'Last Name'].map(l => (<div key={l}><label style={lS}>{l}</label><input style={iS} onFocus={fH} onBlur={bH} /></div>))}
-                  </div>
-                  {['Email', 'Phone', 'NRC / Passport'].map(l => (<div key={l}><label style={lS}>{l}</label><input style={iS} onFocus={fH} onBlur={bH} /></div>))}
-                  <button onClick={() => setStep(2)} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, width: '100%', padding: '12px 0', background: C.navy, color: C.white, fontWeight: 700, fontSize: 14, borderRadius: 8, border: 'none', cursor: 'pointer', fontFamily: font.sans, marginTop: 4 }}>Next <ChevronRight size={14} /></button>
-                </div>
-              )}
-              {step === 2 && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                  <div><label style={lS}>Fund</label><select style={iS}>{funds.map(f => <option key={f.id}>{f.name}</option>)}</select></div>
-                  <div><label style={lS}>Amount (ZMW)</label><input type="number" placeholder="K500 lump / K100 monthly" style={iS} onFocus={fH} onBlur={bH} /></div>
-                  <label style={lS}>Type</label>
-                  <div style={{ display: 'flex', gap: 6 }}>{['Lump Sum (K500+)', 'Monthly DDAC (K100+)', 'Payroll'].map(r => (<button key={r} style={{ flex: 1, padding: '9px 4px', borderRadius: 7, border: `1.5px solid ${C.gray200}`, background: 'transparent', color: C.gray500, fontSize: 11, fontWeight: 600, cursor: 'pointer', fontFamily: font.sans }} onMouseEnter={e => { e.currentTarget.style.borderColor = C.red; e.currentTarget.style.color = C.red; }} onMouseLeave={e => { e.currentTarget.style.borderColor = C.gray200; e.currentTarget.style.color = C.gray500; }}>{r}</button>))}</div>
-                  <div style={{ display: 'flex', gap: 10, marginTop: 4 }}>
-                    <button onClick={() => setStep(1)} style={{ flex: 1, padding: '12px 0', borderRadius: 8, border: `1.5px solid ${C.gray200}`, background: 'transparent', color: C.gray600, fontWeight: 600, fontSize: 13, cursor: 'pointer', fontFamily: font.sans }}>Back</button>
-                    <button onClick={() => setStep(3)} style={{ flex: 2, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '12px 0', background: C.navy, color: C.white, fontWeight: 700, fontSize: 14, borderRadius: 8, border: 'none', cursor: 'pointer', fontFamily: font.sans }}>Next <ChevronRight size={14} /></button>
-                  </div>
-                </div>
-              )}
-              {step === 3 && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                  {['Copy of ID (NRC/Passport)', 'Passport Photo', 'Reference Letter', 'Proof of Residence'].map(l => (
-                    <div key={l} style={{ padding: 14, borderRadius: 10, border: `1.5px dashed ${C.gray300}`, textAlign: 'center', cursor: 'pointer', transition: 'all 0.2s' }}
-                      onMouseEnter={e => { e.currentTarget.style.borderColor = C.red; e.currentTarget.style.background = C.redLight; }}
-                      onMouseLeave={e => { e.currentTarget.style.borderColor = C.gray300; e.currentTarget.style.background = 'transparent'; }}>
-                      <div style={{ fontSize: 13, fontWeight: 700, color: C.gray800, marginBottom: 2 }}>{l}</div>
-                      <div style={{ fontSize: 11, color: C.red, fontWeight: 600 }}>+ Upload</div>
-                    </div>
-                  ))}
-                  <div style={{ display: 'flex', gap: 10, marginTop: 4 }}>
-                    <button onClick={() => setStep(2)} style={{ flex: 1, padding: '12px 0', borderRadius: 8, border: `1.5px solid ${C.gray200}`, background: 'transparent', color: C.gray600, fontWeight: 600, fontSize: 13, cursor: 'pointer', fontFamily: font.sans }}>Back</button>
-                    <button onClick={() => alert('Application submitted!')} style={{ flex: 2, padding: '12px 0', background: C.red, color: C.white, fontWeight: 700, fontSize: 14, borderRadius: 8, border: 'none', cursor: 'pointer', fontFamily: font.sans }}>Submit Application</button>
-                  </div>
-                </div>
-              )}
-            </>
-          )}
-        </div>
-        <p style={{ textAlign: 'center', fontSize: 10, color: C.gray400, marginTop: 14 }}>256-bit SSL · Regulated by SEC & PIA Zambia</p>
+        <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)' }}>Secure Investor Management Portal</p>
       </div>
+
+      {/* Tab toggle */}
+      <div style={{ display: 'flex', justifyContent: 'center', padding: '20px 20px 0' }}>
+        <div style={{ display: 'flex', background: C.gray50, borderRadius: 10, padding: 3, width: isMobile ? '100%' : 360 }}>
+          {['login', 'register'].map(t => (
+            <button key={t} onClick={() => setTab(t)} style={{
+              flex: 1, padding: '10px 0', borderRadius: 8, border: 'none', cursor: 'pointer',
+              fontFamily: font.sans, fontWeight: 600, fontSize: 14,
+              background: tab === t ? C.navy : 'transparent',
+              color: tab === t ? C.white : C.gray400,
+              transition: 'all 0.2s',
+            }}>{t === 'login' ? 'Sign In' : 'Register'}</button>
+          ))}
+        </div>
+      </div>
+
+      {/* Content */}
+      <div style={{ flex: 1, padding: isMobile ? '20px 16px' : '24px 60px', maxWidth: tab === 'login' ? 480 : 720, margin: '0 auto', width: '100%' }}>
+        {tab === 'login' ? <PortalLogin /> : <PortalRegister isMobile={isMobile} />}
+      </div>
+
+      <p style={{ textAlign: 'center', fontSize: 10, color: C.gray400, padding: '12px 0' }}>256-bit SSL · Regulated by SEC & PIA Zambia</p>
     </div>
   );
 }
+
+/* ── Login Tab (redirect) ── */
+function PortalLogin() {
+  return (
+    <div style={{ background: C.white, borderRadius: 16, padding: 32, boxShadow: '0 4px 20px rgba(0,0,0,0.06)', textAlign: 'center', marginTop: 8 }}>
+      <div style={{ width: 64, height: 64, borderRadius: '50%', background: `${C.navy}12`, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' }}>
+        <LogIn size={28} style={{ color: C.navy }} />
+      </div>
+      <h3 style={{ fontFamily: font.serif, fontSize: 20, fontWeight: 700, color: C.gray900, marginBottom: 8 }}>Sign In to Your Account</h3>
+      <p style={{ fontSize: 14, color: C.gray500, lineHeight: 1.6, marginBottom: 20 }}>Access your SIMP Invest portal to manage your investments, track performance, and view your portfolio.</p>
+      <a href="https://online.longhorn-associates.com/auth/login" target="_blank" rel="noopener noreferrer" style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+        width: '100%', padding: '14px 0', background: C.red, color: C.white,
+        fontWeight: 700, fontSize: 14, borderRadius: 8, textDecoration: 'none',
+        fontFamily: font.sans, transition: 'all 0.2s',
+      }}
+        onMouseEnter={e => e.currentTarget.style.background = C.redHover}
+        onMouseLeave={e => e.currentTarget.style.background = C.red}
+      ><LogIn size={16} /> Sign In to SIMP Invest</a>
+      <p style={{ fontSize: 12, color: C.gray400, marginTop: 10 }}>You will be redirected to the secure login portal</p>
+    </div>
+  );
+}
+
+/* ── Registration Wizard ── */
+function PortalRegister({ isMobile }) {
+  const S = portalStyles;
+  const [step, setStep] = useState(1);
+  const [submitting, setSubmitting] = useState(false);
+  const [success, setSuccess] = useState(null);
+  const [errors, setErrors] = useState({});
+
+  /* Lookups */
+  const [lookups, setLookups] = useState(null);
+  const [lookupErr, setLookupErr] = useState(false);
+
+  /* Form state */
+  const [product, setProduct] = useState('');
+  const [applicantType, setApplicantType] = useState('');
+  const [kyc, setKyc] = useState({});
+  const [files, setFiles] = useState({});
+  const [unitTrust, setUnitTrust] = useState({ fundName: '', beneficiary: false, beneficiaryName: '', relationshipWithBeneficiary: '', beneficiaryDOB: '' });
+  const [credit, setCredit] = useState({ loanAmount: '', loanType: '' });
+
+  /* Fetch all 7 lookups on mount */
+  useEffect(() => {
+    let cancelled = false;
+    const endpoints = ['products', 'applicant-types', 'nationalities', 'genders', 'funds', 'loan-types', 'sales-people'];
+    Promise.allSettled(
+      endpoints.map(ep => fetch(`/api/onboarding/lookups/${ep}/`).then(r => { if (!r.ok) throw new Error(r.status); return r.json(); }))
+    ).then(results => {
+      if (cancelled) return;
+      const data = {};
+      endpoints.forEach((ep, i) => {
+        const key = ep.replace(/-([a-z])/g, (_, c) => c.toUpperCase());
+        data[key] = results[i].status === 'fulfilled' ? (Array.isArray(results[i].value) ? results[i].value : results[i].value.results || []) : [];
+      });
+      if (Object.values(data).every(v => v.length === 0)) {
+        setLookupErr(true);
+      } else {
+        setLookups(data);
+      }
+    });
+    return () => { cancelled = true; };
+  }, []);
+
+  const totalSteps = 4;
+  const kycUpdate = (key, val) => setKyc(prev => ({ ...prev, [key]: val }));
+  const fileUpdate = (key, file) => setFiles(prev => ({ ...prev, [key]: file }));
+
+  const isIndividual = applicantType === 'Individual';
+  const isCompany = applicantType === 'Company';
+  const isUnitTrust = product === 'Unit Trust';
+  const isCredit = product === 'Credit Application';
+  const isStockBroking = product === 'Stock Broking';
+
+  /* Simple field-level errors */
+  const fieldErr = (fieldPath) => {
+    if (!errors || typeof errors !== 'object') return null;
+    const parts = fieldPath.split('.');
+    let val = errors;
+    for (const p of parts) {
+      if (!val || typeof val !== 'object') return null;
+      val = val[p];
+    }
+    if (Array.isArray(val)) return val[0];
+    if (typeof val === 'string') return val;
+    return null;
+  };
+
+  /* ── SUBMIT ── */
+  const handleSubmit = async () => {
+    setSubmitting(true);
+    setErrors({});
+    const fd = new FormData();
+    fd.append('product', product);
+    fd.append('applicantType', applicantType);
+
+    /* KYC fields */
+    Object.entries(kyc).forEach(([k, v]) => { if (v !== '' && v != null) fd.append(`mainKycForm[${k}]`, v); });
+
+    /* Files */
+    Object.entries(files).forEach(([k, f]) => { if (f) fd.append(`mainKycForm[${k}]`, f); });
+
+    /* Product-specific */
+    if (isUnitTrust) {
+      fd.append('unitTrustApplication[accountRequests][0][fundName]', unitTrust.fundName);
+      fd.append('unitTrustApplication[accountRequests][0][beneficiary]', String(unitTrust.beneficiary));
+      if (unitTrust.beneficiary) {
+        fd.append('unitTrustApplication[accountRequests][0][beneficiaryName]', unitTrust.beneficiaryName);
+        fd.append('unitTrustApplication[accountRequests][0][relationshipWithBeneficiary]', unitTrust.relationshipWithBeneficiary);
+        fd.append('unitTrustApplication[accountRequests][0][beneficiaryDOB]', unitTrust.beneficiaryDOB);
+      }
+    }
+    if (isCredit) {
+      fd.append('loanApplication[loanAmount]', credit.loanAmount);
+      fd.append('loanApplication[loanType]', credit.loanType);
+    }
+
+    try {
+      /* Product-specific registration endpoints */
+      const registerUrls = {
+        'Unit Trust': '/api/onboarding/register/unit-trust/',
+        'Credit Application': '/api/onboarding/register/credit-application/',
+        'Stock Broking': '/api/onboarding/register/stock-broking/',
+      };
+      const url = registerUrls[product];
+      if (!url) { setErrors({ _general: 'Unknown product selected.' }); setSubmitting(false); return; }
+      const res = await fetch(url, { method: 'POST', body: fd });
+      const data = await res.json();
+      if (res.ok) {
+        setSuccess(data);
+      } else {
+        setErrors(data);
+        /* Jump to the step most likely to have errors */
+        if (data.mainKycForm) setStep(2);
+        else if (data.unitTrustApplication || data.loanApplication) setStep(3);
+      }
+    } catch (err) {
+      setErrors({ _general: 'Network error. Please check your connection and try again.' });
+    }
+    setSubmitting(false);
+  };
+
+  /* ── Loading / Error states ── */
+  if (lookupErr) {
+    return (
+      <div style={{ background: C.white, borderRadius: 16, padding: 32, textAlign: 'center', marginTop: 8 }}>
+        <AlertTriangle size={28} style={{ color: C.red, marginBottom: 8 }} />
+        <div style={{ fontSize: 14, color: C.gray600 }}>Unable to load registration data. Please try again later.</div>
+      </div>
+    );
+  }
+  if (!lookups) {
+    return (
+      <div style={{ background: C.white, borderRadius: 16, padding: 40, textAlign: 'center', marginTop: 8 }}>
+        <div style={{ fontSize: 14, color: C.gray400 }}>Loading registration form…</div>
+      </div>
+    );
+  }
+
+  /* ── Success state ── */
+  if (success) {
+    return (
+      <div style={{ background: C.white, borderRadius: 16, padding: 40, textAlign: 'center', marginTop: 8, boxShadow: '0 4px 20px rgba(0,0,0,0.06)' }}>
+        <div style={{ width: 64, height: 64, borderRadius: '50%', background: `${C.green}15`, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' }}>
+          <CheckCircle size={32} style={{ color: C.green }} />
+        </div>
+        <h3 style={{ fontFamily: font.serif, fontSize: 22, fontWeight: 700, color: C.gray900, marginBottom: 8 }}>Application Submitted!</h3>
+        <p style={{ fontSize: 14, color: C.gray500, marginBottom: 20, lineHeight: 1.6 }}>Your onboarding application has been received and is being processed.</p>
+        <div style={{ display: 'inline-flex', flexDirection: 'column', gap: 8, padding: '16px 28px', borderRadius: 12, background: C.gray50, border: `1px solid ${C.gray100}`, marginBottom: 20, textAlign: 'left' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 24 }}>
+            <span style={{ fontSize: 12, color: C.gray400, fontWeight: 600 }}>Reference</span>
+            <span style={{ fontSize: 14, fontWeight: 700, color: C.navy }}>{success.reference}</span>
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 24 }}>
+            <span style={{ fontSize: 12, color: C.gray400, fontWeight: 600 }}>Status</span>
+            <span style={{ fontSize: 13, fontWeight: 600, color: C.green }}>{success.status}</span>
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 24 }}>
+            <span style={{ fontSize: 12, color: C.gray400, fontWeight: 600 }}>Product</span>
+            <span style={{ fontSize: 13, color: C.gray700 }}>{success.productName}</span>
+          </div>
+        </div>
+        <div>
+          <button onClick={() => { setSuccess(null); setStep(1); setProduct(''); setApplicantType(''); setKyc({}); setFiles({}); setUnitTrust({ fundName: '', beneficiary: false, beneficiaryName: '', relationshipWithBeneficiary: '', beneficiaryDOB: '' }); setCredit({ loanAmount: '', loanType: '' }); }} style={{
+            padding: '12px 28px', background: C.navy, color: C.white, fontWeight: 700, fontSize: 14,
+            borderRadius: 8, border: 'none', cursor: 'pointer', fontFamily: font.sans,
+          }}>Submit Another Application</button>
+        </div>
+      </div>
+    );
+  }
+
+  /* ── Render helpers ── */
+  const InputField = ({ label, name, type = 'text', required, placeholder, value, onChange, options, error }) => (
+    <div style={{ marginBottom: 12 }}>
+      <label style={S.label}>{label} {required && <span style={{ color: C.red }}>*</span>}</label>
+      {options ? (
+        <select value={value || ''} onChange={e => onChange(e.target.value)} style={{ ...S.input, background: C.white }}>
+          <option value="">Select…</option>
+          {options.map(o => {
+            const val = typeof o === 'object' ? (o.name || o.label || o.id) : o;
+            const display = typeof o === 'object' ? (o.name || o.label || o.id) : o;
+            return <option key={val} value={val}>{display}</option>;
+          })}
+        </select>
+      ) : (
+        <input type={type} placeholder={placeholder} value={value || ''} onChange={e => onChange(e.target.value)} style={S.input}
+          onFocus={e => e.target.style.borderColor = C.red} onBlur={e => e.target.style.borderColor = C.gray200} />
+      )}
+      {(error || fieldErr(`mainKycForm.${name}`)) && <div style={{ fontSize: 11, color: C.red, marginTop: 3 }}>{error || fieldErr(`mainKycForm.${name}`)}</div>}
+    </div>
+  );
+
+  const FileField = ({ label, name, required, hint }) => (
+    <div style={{ marginBottom: 12 }}>
+      <label style={S.label}>{label} {required && <span style={{ color: C.red }}>*</span>} {hint && <span style={{ color: C.gray400, fontWeight: 400 }}>({hint})</span>}</label>
+      <div style={{
+        padding: '12px 16px', borderRadius: 10, border: `1.5px dashed ${files[name] ? C.green : C.gray300}`,
+        background: files[name] ? `${C.green}08` : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        transition: 'all 0.2s', cursor: 'pointer', position: 'relative',
+      }}>
+        <div>
+          <div style={{ fontSize: 13, fontWeight: 600, color: files[name] ? C.green : C.gray700 }}>
+            {files[name] ? files[name].name : 'Choose file…'}
+          </div>
+          {!files[name] && <div style={{ fontSize: 11, color: C.gray400, marginTop: 2 }}>PDF, JPG, or PNG (max 5MB)</div>}
+        </div>
+        <div style={{ fontSize: 11, fontWeight: 700, color: files[name] ? C.green : C.red }}>{files[name] ? '✓ Uploaded' : '+ Upload'}</div>
+        <input type="file" accept=".pdf,.jpg,.jpeg,.png" onChange={e => fileUpdate(name, e.target.files[0])} style={{ position: 'absolute', inset: 0, opacity: 0, cursor: 'pointer' }} />
+      </div>
+      {fieldErr(`mainKycForm.${name}`) && <div style={{ fontSize: 11, color: C.red, marginTop: 3 }}>{fieldErr(`mainKycForm.${name}`)}</div>}
+    </div>
+  );
+
+  /* ═══ WIZARD STEPS ═══ */
+  return (
+    <div style={{ background: C.white, borderRadius: 16, padding: isMobile ? 20 : 32, boxShadow: '0 4px 20px rgba(0,0,0,0.06)', marginTop: 8 }}>
+      {/* Progress bar */}
+      <div style={{ display: 'flex', gap: 4, marginBottom: 20 }}>
+        {Array.from({ length: totalSteps }, (_, i) => (
+          <div key={i} style={{ flex: 1, height: 4, borderRadius: 2, background: i + 1 <= step ? C.red : C.gray200, transition: 'background 0.3s' }} />
+        ))}
+      </div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+        <div>
+          <h3 style={{ fontFamily: font.serif, fontSize: 17, fontWeight: 700, color: C.gray900, marginBottom: 2 }}>
+            {step === 1 ? 'Choose Product' : step === 2 ? 'KYC Details' : step === 3 ? (isUnitTrust ? 'Fund Selection & Documents' : isCredit ? 'Loan Details & Documents' : 'Upload Documents') : 'Review & Submit'}
+          </h3>
+          <p style={{ fontSize: 12, color: C.gray400 }}>Step {step} of {totalSteps}</p>
+        </div>
+      </div>
+
+      {/* General error */}
+      {errors._general && (
+        <div style={{ padding: '10px 14px', borderRadius: 8, background: `${C.red}10`, border: `1px solid ${C.red}30`, marginBottom: 16 }}>
+          <p style={{ fontSize: 12, color: C.red, fontWeight: 600 }}>{errors._general}</p>
+        </div>
+      )}
+
+      {/* ─── STEP 1: Product & Applicant Type ─── */}
+      {step === 1 && (
+        <div>
+          <InputField label="Product" name="product" required options={lookups.products} value={product} onChange={v => { setProduct(v); setKyc({}); setFiles({}); }} />
+          <InputField label="Applicant Type" name="applicantType" required options={lookups.applicantTypes} value={applicantType} onChange={v => { setApplicantType(v); setKyc({}); }} />
+          {product && applicantType && (
+            <div style={{ padding: '12px 16px', borderRadius: 10, background: C.gray50, border: `1px solid ${C.gray100}`, marginTop: 12, marginBottom: 16 }}>
+              <p style={{ fontSize: 12, color: C.gray600 }}>
+                You are applying for <b style={{ color: C.navy }}>{product}</b> as {applicantType === 'Individual' ? 'an' : 'a'} <b style={{ color: C.navy }}>{applicantType}</b>.
+                {isStockBroking && ' Only KYC information is required for this product.'}
+                {isUnitTrust && ' You will also select a fund and optionally add a beneficiary.'}
+                {isCredit && ' You will also provide loan details.'}
+              </p>
+            </div>
+          )}
+          <button disabled={!product || !applicantType} onClick={() => setStep(2)} style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+            width: '100%', padding: '12px 0', background: (!product || !applicantType) ? C.gray300 : C.navy, color: C.white,
+            fontWeight: 700, fontSize: 14, borderRadius: 8, border: 'none', cursor: (!product || !applicantType) ? 'not-allowed' : 'pointer',
+            fontFamily: font.sans, marginTop: 8, transition: 'all 0.2s',
+          }}>Next: KYC Details <ChevronRight size={14} /></button>
+        </div>
+      )}
+
+      {/* ─── STEP 2: KYC Details ─── */}
+      {step === 2 && (
+        <div>
+          {isIndividual && (
+            <>
+              <div style={S.grid2}>
+                <InputField label="First Name" name="firstName" required value={kyc.firstName} onChange={v => kycUpdate('firstName', v)} />
+                <InputField label="Middle Name" name="middleName" value={kyc.middleName} onChange={v => kycUpdate('middleName', v)} />
+              </div>
+              <InputField label="Last Name" name="lastName" required value={kyc.lastName} onChange={v => kycUpdate('lastName', v)} />
+              <div style={S.grid2}>
+                <InputField label="Email Address" name="emailAddress" type="email" required value={kyc.emailAddress} onChange={v => kycUpdate('emailAddress', v)} />
+                <InputField label="Phone Number" name="phoneNumber" required placeholder="+260 97..." value={kyc.phoneNumber} onChange={v => kycUpdate('phoneNumber', v)} />
+              </div>
+              <div style={S.grid2}>
+                <InputField label="Date of Birth" name="DOB" type="date" required value={kyc.DOB} onChange={v => kycUpdate('DOB', v)} />
+                <InputField label="Gender" name="gender" required options={lookups.genders} value={kyc.gender} onChange={v => kycUpdate('gender', v)} />
+              </div>
+              <div style={S.grid2}>
+                <InputField label="Nationality" name="nationality" required options={lookups.nationalities} value={kyc.nationality} onChange={v => kycUpdate('nationality', v)} />
+                <InputField label="ID Type" name="IDType" required options={['NRC', 'Passport', 'Driver\'s License']} value={kyc.IDType} onChange={v => kycUpdate('IDType', v)} />
+              </div>
+              <InputField label="ID Number" name="IDNumber" required placeholder="e.g. 123456/10/1" value={kyc.IDNumber} onChange={v => kycUpdate('IDNumber', v)} />
+              <InputField label="Physical Address" name="physicalAddress" required value={kyc.physicalAddress} onChange={v => kycUpdate('physicalAddress', v)} />
+              <div style={S.grid2}>
+                <InputField label="Employer" name="employer" value={kyc.employer} onChange={v => kycUpdate('employer', v)} />
+                <InputField label="Employee Number" name="employeeNumber" value={kyc.employeeNumber} onChange={v => kycUpdate('employeeNumber', v)} />
+              </div>
+              {isUnitTrust && (
+                <InputField label="Source of Income" name="sourceOfIncome" required value={kyc.sourceOfIncome} onChange={v => kycUpdate('sourceOfIncome', v)} placeholder="e.g. Salary, Business" />
+              )}
+              <InputField label="Sales Person" name="salesPerson" options={lookups.salesPeople} value={kyc.salesPerson} onChange={v => kycUpdate('salesPerson', v)} />
+              <div style={{ marginTop: 8, marginBottom: 8, fontSize: 12, fontWeight: 700, color: C.gray700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Banking Details</div>
+              <div style={S.grid2}>
+                <InputField label="Bank Name" name="bankName" required value={kyc.bankName} onChange={v => kycUpdate('bankName', v)} />
+                <InputField label="Branch Name" name="bankBranchName" value={kyc.bankBranchName} onChange={v => kycUpdate('bankBranchName', v)} />
+              </div>
+              <div style={S.grid2}>
+                <InputField label="Account Number" name="bankAccountNumber" required value={kyc.bankAccountNumber} onChange={v => kycUpdate('bankAccountNumber', v)} />
+                <InputField label="Account Name" name="bankAccountName" required value={kyc.bankAccountName} onChange={v => kycUpdate('bankAccountName', v)} />
+              </div>
+              <div style={{ marginTop: 8, marginBottom: 8, fontSize: 12, fontWeight: 700, color: C.gray700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Next of Kin</div>
+              <div style={S.grid2}>
+                <InputField label="Next of Kin" name="nextOfKin" required value={kyc.nextOfKin} onChange={v => kycUpdate('nextOfKin', v)} />
+                <InputField label="Next of Kin Phone" name="nextOfKinPhone" required value={kyc.nextOfKinPhone} onChange={v => kycUpdate('nextOfKinPhone', v)} />
+              </div>
+              <InputField label="Relationship" name="relationshipWithNextOfKin" required value={kyc.relationshipWithNextOfKin} onChange={v => kycUpdate('relationshipWithNextOfKin', v)} placeholder="e.g. Spouse, Sibling" />
+            </>
+          )}
+          {isCompany && (
+            <>
+              <InputField label="Company Name" name="companyName" required value={kyc.companyName} onChange={v => kycUpdate('companyName', v)} />
+              <InputField label="Company ID / Registration Number" name="companyIDNumber" required value={kyc.companyIDNumber} onChange={v => kycUpdate('companyIDNumber', v)} />
+              <div style={S.grid2}>
+                <InputField label="Contact Person" name="contactPerson" required value={kyc.contactPerson} onChange={v => kycUpdate('contactPerson', v)} />
+                <InputField label="Contact Person Phone" name="contactPersonPhone" required value={kyc.contactPersonPhone} onChange={v => kycUpdate('contactPersonPhone', v)} />
+              </div>
+              <InputField label="Contact Person Email" name="contactPersonEmail" type="email" value={kyc.contactPersonEmail} onChange={v => kycUpdate('contactPersonEmail', v)} />
+              <div style={S.grid2}>
+                <InputField label="Company Email" name="emailAddress" type="email" required value={kyc.emailAddress} onChange={v => kycUpdate('emailAddress', v)} />
+                <InputField label="Company Phone" name="phoneNumber" required value={kyc.phoneNumber} onChange={v => kycUpdate('phoneNumber', v)} />
+              </div>
+              <div style={S.grid2}>
+                <InputField label="Nationality" name="nationality" required options={lookups.nationalities} value={kyc.nationality} onChange={v => kycUpdate('nationality', v)} />
+                <InputField label="ID Type" name="IDType" required options={['Certificate of Incorporation', 'Business Registration']} value={kyc.IDType} onChange={v => kycUpdate('IDType', v)} />
+              </div>
+              <InputField label="Physical Address" name="physicalAddress" required value={kyc.physicalAddress} onChange={v => kycUpdate('physicalAddress', v)} />
+              <InputField label="Sales Person" name="salesPerson" options={lookups.salesPeople} value={kyc.salesPerson} onChange={v => kycUpdate('salesPerson', v)} />
+              <div style={{ marginTop: 8, marginBottom: 8, fontSize: 12, fontWeight: 700, color: C.gray700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Banking Details</div>
+              <div style={S.grid2}>
+                <InputField label="Bank Name" name="bankName" required value={kyc.bankName} onChange={v => kycUpdate('bankName', v)} />
+                <InputField label="Branch Name" name="bankBranchName" value={kyc.bankBranchName} onChange={v => kycUpdate('bankBranchName', v)} />
+              </div>
+              <div style={S.grid2}>
+                <InputField label="Account Number" name="bankAccountNumber" required value={kyc.bankAccountNumber} onChange={v => kycUpdate('bankAccountNumber', v)} />
+                <InputField label="Account Name" name="bankAccountName" required value={kyc.bankAccountName} onChange={v => kycUpdate('bankAccountName', v)} />
+              </div>
+              <div style={{ marginTop: 8, marginBottom: 8, fontSize: 12, fontWeight: 700, color: C.gray700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Next of Kin / Authorized Representative</div>
+              <div style={S.grid2}>
+                <InputField label="Next of Kin" name="nextOfKin" required value={kyc.nextOfKin} onChange={v => kycUpdate('nextOfKin', v)} />
+                <InputField label="Next of Kin Phone" name="nextOfKinPhone" required value={kyc.nextOfKinPhone} onChange={v => kycUpdate('nextOfKinPhone', v)} />
+              </div>
+              <InputField label="Relationship" name="relationshipWithNextOfKin" required value={kyc.relationshipWithNextOfKin} onChange={v => kycUpdate('relationshipWithNextOfKin', v)} />
+            </>
+          )}
+          {/* Nav buttons */}
+          <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
+            <button onClick={() => setStep(1)} style={{ flex: 1, padding: '12px 0', borderRadius: 8, border: `1.5px solid ${C.gray200}`, background: 'transparent', color: C.gray600, fontWeight: 600, fontSize: 13, cursor: 'pointer', fontFamily: font.sans }}>Back</button>
+            <button onClick={() => setStep(3)} style={{ flex: 2, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '12px 0', background: C.navy, color: C.white, fontWeight: 700, fontSize: 14, borderRadius: 8, border: 'none', cursor: 'pointer', fontFamily: font.sans }}>Next <ChevronRight size={14} /></button>
+          </div>
+        </div>
+      )}
+
+      {/* ─── STEP 3: Product-Specific + Documents ─── */}
+      {step === 3 && (
+        <div>
+          {/* Unit Trust fields */}
+          {isUnitTrust && (
+            <div style={{ marginBottom: 20 }}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: C.navy, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 10 }}>Fund Selection</div>
+              <InputField label="Fund" name="fundName" required options={lookups.funds} value={unitTrust.fundName} onChange={v => setUnitTrust(p => ({ ...p, fundName: v }))} />
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
+                <label style={{ fontSize: 13, color: C.gray700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <input type="checkbox" checked={unitTrust.beneficiary} onChange={e => setUnitTrust(p => ({ ...p, beneficiary: e.target.checked }))} style={{ accentColor: C.red }} />
+                  Add a beneficiary to this account
+                </label>
+              </div>
+              {unitTrust.beneficiary && (
+                <div style={{ padding: '14px 16px', borderRadius: 10, background: C.gray50, border: `1px solid ${C.gray100}`, marginBottom: 12 }}>
+                  <InputField label="Beneficiary Name" name="beneficiaryName" required value={unitTrust.beneficiaryName} onChange={v => setUnitTrust(p => ({ ...p, beneficiaryName: v }))} />
+                  <div style={S.grid2}>
+                    <InputField label="Relationship" name="relationshipWithBeneficiary" required value={unitTrust.relationshipWithBeneficiary} onChange={v => setUnitTrust(p => ({ ...p, relationshipWithBeneficiary: v }))} placeholder="e.g. Child, Spouse" />
+                    <InputField label="Date of Birth" name="beneficiaryDOB" type="date" required value={unitTrust.beneficiaryDOB} onChange={v => setUnitTrust(p => ({ ...p, beneficiaryDOB: v }))} />
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+          {/* Credit fields */}
+          {isCredit && (
+            <div style={{ marginBottom: 20 }}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: C.navy, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 10 }}>Loan Details</div>
+              <div style={S.grid2}>
+                <InputField label="Loan Amount (ZMW)" name="loanAmount" type="number" required placeholder="e.g. 50000" value={credit.loanAmount} onChange={v => setCredit(p => ({ ...p, loanAmount: v }))} />
+                <InputField label="Loan Type" name="loanType" required options={lookups.loanTypes} value={credit.loanType} onChange={v => setCredit(p => ({ ...p, loanType: v }))} />
+              </div>
+            </div>
+          )}
+          {/* File uploads */}
+          <div style={{ fontSize: 12, fontWeight: 700, color: C.navy, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 10, marginTop: isStockBroking ? 0 : 8 }}>Upload Documents</div>
+          <FileField label="Copy of ID (NRC / Passport)" name="copyOfId" required />
+          {isIndividual && <FileField label="Passport Size Photo" name="passportSizePhoto" required />}
+          <div style={{ padding: '10px 14px', borderRadius: 8, background: `${C.navy}08`, border: `1px solid ${C.navy}15`, marginBottom: 12 }}>
+            <p style={{ fontSize: 11, color: C.gray600, lineHeight: 1.5 }}>
+              <b>Note:</b> Please upload at least one of the following — a <b>Reference Letter</b> or <b>Proof of Residence</b> (e.g. utility bill). If you provide one, the other is not required.
+            </p>
+          </div>
+          <div style={S.grid2}>
+            <FileField label="Reference Letter" name="referenceLetter" hint="optional if POR provided" />
+            <FileField label="Proof of Residence" name="proofOfResidence" hint="optional if RL provided" />
+          </div>
+          {/* Declaration */}
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginTop: 16, marginBottom: 8 }}>
+            <input type="checkbox" checked={kyc.declaration === 'true'} onChange={e => kycUpdate('declaration', e.target.checked ? 'true' : '')} style={{ marginTop: 3, accentColor: C.red }} />
+            <label style={{ fontSize: 12, color: C.gray600, lineHeight: 1.5, cursor: 'pointer' }} onClick={() => kycUpdate('declaration', kyc.declaration === 'true' ? '' : 'true')}>
+              I declare that all information provided is true and accurate to the best of my knowledge. I understand that providing false information may result in my application being rejected.
+            </label>
+          </div>
+          {/* Nav buttons */}
+          <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
+            <button onClick={() => setStep(2)} style={{ flex: 1, padding: '12px 0', borderRadius: 8, border: `1.5px solid ${C.gray200}`, background: 'transparent', color: C.gray600, fontWeight: 600, fontSize: 13, cursor: 'pointer', fontFamily: font.sans }}>Back</button>
+            <button onClick={() => setStep(4)} style={{ flex: 2, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '12px 0', background: C.navy, color: C.white, fontWeight: 700, fontSize: 14, borderRadius: 8, border: 'none', cursor: 'pointer', fontFamily: font.sans }}>Review Application <ChevronRight size={14} /></button>
+          </div>
+        </div>
+      )}
+
+      {/* ─── STEP 4: Review & Submit ─── */}
+      {step === 4 && (
+        <div>
+          <div style={{ fontSize: 12, color: C.gray500, marginBottom: 16, lineHeight: 1.5 }}>Please review your application details before submitting.</div>
+          {/* Summary sections */}
+          {[
+            { title: 'Application', rows: [['Product', product], ['Applicant Type', applicantType]] },
+            { title: isIndividual ? 'Personal Details' : 'Company Details', rows: isIndividual
+              ? [['Name', [kyc.firstName, kyc.middleName, kyc.lastName].filter(Boolean).join(' ')], ['Email', kyc.emailAddress], ['Phone', kyc.phoneNumber], ['DOB', kyc.DOB], ['ID', `${kyc.IDType || ''} — ${kyc.IDNumber || ''}`], ['Address', kyc.physicalAddress]]
+              : [['Company', kyc.companyName], ['Reg. No.', kyc.companyIDNumber], ['Contact', kyc.contactPerson], ['Email', kyc.emailAddress], ['Phone', kyc.phoneNumber], ['Address', kyc.physicalAddress]]
+            },
+            { title: 'Banking', rows: [['Bank', kyc.bankName], ['Account', `${kyc.bankAccountName || ''} — ${kyc.bankAccountNumber || ''}`]] },
+            ...(isUnitTrust ? [{ title: 'Unit Trust', rows: [['Fund', unitTrust.fundName], ['Beneficiary', unitTrust.beneficiary ? `${unitTrust.beneficiaryName} (${unitTrust.relationshipWithBeneficiary})` : 'None']] }] : []),
+            ...(isCredit ? [{ title: 'Loan', rows: [['Amount', `K ${Number(credit.loanAmount || 0).toLocaleString()}`], ['Type', credit.loanType]] }] : []),
+            { title: 'Documents', rows: [
+              ['Copy of ID', files.copyOfId ? files.copyOfId.name : '—'],
+              ...(isIndividual ? [['Passport Photo', files.passportSizePhoto ? files.passportSizePhoto.name : '—']] : []),
+              ['Reference Letter', files.referenceLetter ? files.referenceLetter.name : '—'],
+              ['Proof of Residence', files.proofOfResidence ? files.proofOfResidence.name : '—'],
+            ]},
+          ].map(section => (
+            <div key={section.title} style={{ marginBottom: 14 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: C.navy, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>{section.title}</div>
+              <div style={{ padding: '10px 14px', borderRadius: 10, background: C.gray50, border: `1px solid ${C.gray100}` }}>
+                {section.rows.filter(([, v]) => v).map(([label, value]) => (
+                  <div key={label} style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', borderBottom: `1px solid ${C.gray100}` }}>
+                    <span style={{ fontSize: 12, color: C.gray400, fontWeight: 500 }}>{label}</span>
+                    <span style={{ fontSize: 12, color: C.gray800, fontWeight: 600, textAlign: 'right', maxWidth: '60%', overflow: 'hidden', textOverflow: 'ellipsis' }}>{value}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+
+          {/* Nav + Submit */}
+          <div style={{ display: 'flex', gap: 10, marginTop: 20 }}>
+            <button onClick={() => setStep(3)} style={{ flex: 1, padding: '12px 0', borderRadius: 8, border: `1.5px solid ${C.gray200}`, background: 'transparent', color: C.gray600, fontWeight: 600, fontSize: 13, cursor: 'pointer', fontFamily: font.sans }}>Back</button>
+            <button disabled={submitting} onClick={handleSubmit} style={{
+              flex: 2, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+              padding: '13px 0', background: submitting ? C.gray400 : C.red, color: C.white,
+              fontWeight: 700, fontSize: 14, borderRadius: 8, border: 'none',
+              cursor: submitting ? 'not-allowed' : 'pointer', fontFamily: font.sans, transition: 'all 0.2s',
+            }}>
+              {submitting ? 'Submitting…' : 'Submit Application'} {!submitting && <ArrowRight size={14} />}
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 
 /* ═══════════════════════════════════════════ */
 /*  TOOLS PAGE (Calculator standalone)        */
