@@ -139,6 +139,31 @@
     },
 
     {
+      "source": "/api/projector-parameters/",
+      "destination": "https://longhorn-api.onrender.com/api/projector-parameters/"
+    },
+    {
+      "source": "/api/projector-parameters",
+      "destination": "https://longhorn-api.onrender.com/api/projector-parameters/"
+    },
+    {
+      "source": "/api/funds/",
+      "destination": "https://longhorn-api.onrender.com/api/funds/"
+    },
+    {
+      "source": "/api/funds",
+      "destination": "https://longhorn-api.onrender.com/api/funds/"
+    },
+    {
+      "source": "/api/unit-trust-projection/",
+      "destination": "https://longhorn-api.onrender.com/api/unit-trust-projection/"
+    },
+    {
+      "source": "/api/unit-trust-projection",
+      "destination": "https://longhorn-api.onrender.com/api/unit-trust-projection/"
+    },
+
+    {
       "source": "/api/:path*",
       "destination": "https://longhorn-api.onrender.com/api/:path*"
     }

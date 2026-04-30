@@ -85,6 +85,24 @@ function genChart(months=12, base=100, growth=0.08) {
 const LONGHORN_API = process.env.REACT_APP_LONGHORN_API || 'https://longhorn-api.onrender.com';
 
 /* ═══════════════════════════════════════════ */
+/*  CACHED FETCH — in-memory cache for GET     */
+/*  Data updates once daily, so 60-min TTL is  */
+/*  safe and eliminates redundant API calls    */
+/* ═══════════════════════════════════════════ */
+const _apiCache = {};
+async function cachedFetch(url, ttlMinutes = 60) {
+  const now = Date.now();
+  if (_apiCache[url] && (now - _apiCache[url].ts) < ttlMinutes * 60 * 1000) {
+    return _apiCache[url].data;
+  }
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(res.status);
+  const data = await res.json();
+  _apiCache[url] = { data, ts: now };
+  return data;
+}
+
+/* ═══════════════════════════════════════════ */
 /*  MARKET TICKER (Fund Performance + FX API)  */
 /* ═══════════════════════════════════════════ */
 const FALLBACK_TICKER = [
@@ -104,8 +122,8 @@ function MarketTicker() {
 
     /* Fetch both APIs in parallel */
     Promise.allSettled([
-      fetch('/api/fund-performance/').then(r => { if (!r.ok) throw new Error(r.status); return r.json(); }),
-      fetch('/api/foreign-exchange/').then(r => { if (!r.ok) throw new Error(r.status); return r.json(); }),
+      cachedFetch('/api/fund-performance/'),
+      cachedFetch('/api/foreign-exchange/'),
     ]).then(([fundResult, fxResult]) => {
       if (cancelled) return;
       const tickerData = [];
@@ -558,7 +576,7 @@ function FundDetailPage({ fundId, onNavigate }) {
           )}
 
           {activeTab === 'project' && (
-            <ReturnCalculator fund={fund} />
+            <ReturnCalculator initialFund={fund.name} onNavigate={onNavigate} />
           )}
 
           {activeTab === 'documents' && (
@@ -653,128 +671,355 @@ function FundDetailPage({ fundId, onNavigate }) {
 }
 
 /* ═══════════════════════════════════════════ */
-/*  RETURN PROJECTION CALCULATOR              */
+/*  RETURN PROJECTION CALCULATOR (Live API)    */
+/*  GET /api/projector-parameters/ for setup   */
+/*  POST /api/unit-trust-projection/ to run    */
 /* ═══════════════════════════════════════════ */
-function ReturnCalculator({ fund, onNavigate }) {
-  const [initial, setInitial] = useState(20000);
-  const [monthly, setMonthly] = useState(2000);
-  const [horizon, setHorizon] = useState(5);
-  const [scenario, setScenario] = useState('historical');
-  const [calculated, setCalculated] = useState(false);
+function ReturnCalculator({ initialFund, onNavigate }) {
   const isMobile = useIsMobile();
+  const [params, setParams] = useState(null);
+  const [paramsErr, setParamsErr] = useState(false);
 
-  const rates = { historical: parseFloat(fund?.returnRate || 8)/100, conservative: 0.05, balanced: 0.08, optimistic: 0.12 };
-  const rate = rates[scenario];
-  const totalInvested = initial + monthly * 12 * horizon;
-  const futureValue = initial * Math.pow(1 + rate, horizon) + monthly * ((Math.pow(1 + rate/12, horizon*12) - 1) / (rate/12));
-  const bestCase = futureValue * 1.15;
-  const worstCase = futureValue * 0.85;
+  /* Form state */
+  const [fund, setFund] = useState('');
+  const [mode, setMode] = useState('');
+  const [tenure, setTenure] = useState('');
+  const [monthlyDeposit, setMonthlyDeposit] = useState('');
+  const [lumpsumDeposit, setLumpsumDeposit] = useState('');
+  const [minMonthly, setMinMonthly] = useState('');
+  const [maxMonthly, setMaxMonthly] = useState('');
 
-  const projChart = [];
-  for (let y = 0; y <= horizon; y++) {
-    const val = initial * Math.pow(1 + rate, y) + monthly * 12 * y * (1 + rate * y/2);
-    projChart.push({ month: `${y}yr`, value: val });
+  /* Submission */
+  const [submitting, setSubmitting] = useState(false);
+  const [result, setResult] = useState(null);
+  const [errors, setErrors] = useState({});
+
+  /* Fetch projector parameters on mount */
+  useEffect(() => {
+    let cancelled = false;
+    cachedFetch('/api/projector-parameters/')
+      .then(data => {
+        if (cancelled) return;
+        setParams(data);
+        /* Pre-select fund if coming from Fund Detail page */
+        if (initialFund) {
+          const match = (data.funds || []).find(f =>
+            f.name.toLowerCase().includes(initialFund.toLowerCase()) ||
+            initialFund.toLowerCase().includes(f.name.toLowerCase().replace('longhorn ', ''))
+          );
+          if (match) setFund(match.name);
+        }
+      })
+      .catch(() => { if (!cancelled) setParamsErr(true); });
+    return () => { cancelled = true; };
+  }, [initialFund]);
+
+  /* Clear mode-specific fields when mode changes */
+  const handleModeChange = (newMode) => {
+    setMode(newMode);
+    setMonthlyDeposit('');
+    setLumpsumDeposit('');
+    setMinMonthly('');
+    setMaxMonthly('');
+    setResult(null);
+    setErrors({});
+  };
+
+  /* Get mode info */
+  const modeInfo = params?.projection_modes?.find(m => m.projection_mode === mode);
+  const modeLabel = (m) => (m || '').replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+
+  /* Submit projection */
+  const handleSubmit = async () => {
+    setSubmitting(true);
+    setErrors({});
+    setResult(null);
+
+    const body = { fund, projection_mode: mode, tenure_months: Number(tenure) };
+
+    if (mode === 'monthly_deposits') body.monthly_deposit = Number(monthlyDeposit);
+    else if (mode === 'lumpsum_deposit') body.lumpsum_deposit = Number(lumpsumDeposit);
+    else if (mode === 'hybrid_deposits') { body.monthly_deposit = Number(monthlyDeposit); body.lumpsum_deposit = Number(lumpsumDeposit); }
+    else if (mode === 'varying_monthly_deposits') { body.minimum_monthly_deposit = Number(minMonthly); body.maximum_monthly_deposit = Number(maxMonthly); }
+
+    try {
+      const res = await fetch('/api/unit-trust-projection/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setResult(data);
+      } else {
+        setErrors(data);
+      }
+    } catch (err) {
+      setErrors({ detail: 'Network error. Please try again.' });
+    }
+    setSubmitting(false);
+  };
+
+  const canSubmit = fund && mode && tenure && Number(tenure) >= 1 && Number(tenure) <= 60 && (
+    (mode === 'monthly_deposits' && monthlyDeposit) ||
+    (mode === 'lumpsum_deposit' && lumpsumDeposit) ||
+    (mode === 'hybrid_deposits' && monthlyDeposit && lumpsumDeposit) ||
+    (mode === 'varying_monthly_deposits' && minMonthly && maxMonthly)
+  );
+
+  const fmtK = (v) => v != null ? `K ${Number(v).toLocaleString('en', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '—';
+
+  /* Loading / Error */
+  if (paramsErr) {
+    return (
+      <div style={{ padding: 32, textAlign: 'center' }}>
+        <AlertTriangle size={28} style={{ color: C.red, marginBottom: 8 }} />
+        <div style={{ fontSize: 14, color: C.gray600 }}>Unable to load calculator parameters.</div>
+      </div>
+    );
+  }
+  if (!params) {
+    return <div style={{ padding: 40, textAlign: 'center', color: C.gray400, fontSize: 14 }}>Loading calculator…</div>;
   }
 
+  const iS = { width: '100%', padding: '10px 14px', borderRadius: 8, border: `1.5px solid ${C.gray200}`, fontSize: 13, fontFamily: font.sans, outline: 'none', color: C.gray800, background: C.white };
+  const lS = { display: 'block', fontSize: 11, fontWeight: 600, color: C.gray600, marginBottom: 4 };
+
   return (
-    <div style={{ padding: 4 }}>
-      <h3 style={{ fontFamily: font.serif, fontSize: 22, fontWeight: 700, color: C.gray900, marginBottom: 4 }}>
-        Return Projection Calculator
-      </h3>
-      <p style={{ fontSize: 13, color: C.gray400, marginBottom: 24 }}>
-        {fund ? `Fund: ${fund.name}` : 'Estimate your investment growth'}
-      </p>
-
-      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1.4fr', gap: 28 }}>
-        {/* Inputs */}
+    <div>
+      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1.2fr', gap: 28 }}>
+        {/* ── LEFT: Form ── */}
         <div>
-          <div style={{ padding: 20, background: C.gray50, borderRadius: 12, border: `1px solid ${C.gray100}` }}>
-            {[
-              { label: 'Initial Investment', value: initial, set: setInitial, prefix: 'K' },
-              { label: 'Monthly Contribution', value: monthly, set: setMonthly, prefix: 'K' },
-            ].map(({ label, value, set, prefix }) => (
-              <div key={label} style={{ marginBottom: 16 }}>
-                <label style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, fontWeight: 600, color: C.gray600, marginBottom: 6 }}>
-                  <span>{label}</span>
-                  <span style={{ color: C.navy, fontWeight: 700 }}>{prefix} {value.toLocaleString()}</span>
-                </label>
-                <input type="range" min="0" max={label.includes('Initial') ? 100000 : 10000} step={label.includes('Initial') ? 1000 : 100} value={value} onChange={e => set(+e.target.value)} style={{ width: '100%', accentColor: C.red }} />
+          <div style={{ padding: 22, background: C.white, borderRadius: 14, border: `1px solid ${C.gray100}`, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
+            {/* Fund */}
+            <div style={{ marginBottom: 14 }}>
+              <label style={lS}>Fund <span style={{ color: C.red }}>*</span></label>
+              <select value={fund} onChange={e => { setFund(e.target.value); setResult(null); }} style={{ ...iS, background: C.white }}>
+                <option value="">Select fund…</option>
+                {(params.funds || []).map(f => <option key={f.name} value={f.name}>{f.name}</option>)}
+              </select>
+              {errors.fund && <div style={{ fontSize: 11, color: C.red, marginTop: 3 }}>{errors.fund}</div>}
+            </div>
+
+            {/* Projection Mode */}
+            <div style={{ marginBottom: 14 }}>
+              <label style={lS}>Projection Mode <span style={{ color: C.red }}>*</span></label>
+              <select value={mode} onChange={e => handleModeChange(e.target.value)} style={{ ...iS, background: C.white }}>
+                <option value="">Select mode…</option>
+                {(params.projection_modes || []).map(m => (
+                  <option key={m.projection_mode} value={m.projection_mode}>{modeLabel(m.projection_mode)}</option>
+                ))}
+              </select>
+              {modeInfo && (
+                <div style={{ fontSize: 11, color: C.gray400, marginTop: 6, padding: '8px 10px', background: C.gray50, borderRadius: 6, lineHeight: 1.5 }}>
+                  {modeInfo.required_inputs}
+                </div>
+              )}
+              {errors.projection_mode && <div style={{ fontSize: 11, color: C.red, marginTop: 3 }}>{errors.projection_mode}</div>}
+            </div>
+
+            {/* Tenure */}
+            <div style={{ marginBottom: 14 }}>
+              <label style={lS}>Investment Period (months) <span style={{ color: C.red }}>*</span></label>
+              <input type="number" min="1" max="60" placeholder="1–60" value={tenure} onChange={e => { setTenure(e.target.value); setResult(null); }} style={iS}
+                onFocus={e => e.target.style.borderColor = C.red} onBlur={e => e.target.style.borderColor = C.gray200} />
+              <div style={{ fontSize: 10, color: C.gray400, marginTop: 3 }}>Maximum 60 months</div>
+              {errors.tenure_months && <div style={{ fontSize: 11, color: C.red, marginTop: 3 }}>{errors.tenure_months}</div>}
+            </div>
+
+            {/* Dynamic fields per mode */}
+            {(mode === 'monthly_deposits' || mode === 'hybrid_deposits') && (
+              <div style={{ marginBottom: 14 }}>
+                <label style={lS}>Monthly Deposit (ZMW) <span style={{ color: C.red }}>*</span></label>
+                <input type="number" min="0" placeholder="e.g. 3000" value={monthlyDeposit} onChange={e => { setMonthlyDeposit(e.target.value); setResult(null); }} style={iS}
+                  onFocus={e => e.target.style.borderColor = C.red} onBlur={e => e.target.style.borderColor = C.gray200} />
+                {errors.monthly_deposit && <div style={{ fontSize: 11, color: C.red, marginTop: 3 }}>{errors.monthly_deposit}</div>}
               </div>
-            ))}
-            <div style={{ marginBottom: 16 }}>
-              <label style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, fontWeight: 600, color: C.gray600, marginBottom: 6 }}>
-                <span>Investment Horizon</span>
-                <span style={{ color: C.navy, fontWeight: 700 }}>{horizon} Years</span>
-              </label>
-              <input type="range" min="1" max="30" value={horizon} onChange={e => setHorizon(+e.target.value)} style={{ width: '100%', accentColor: C.red }} />
-            </div>
+            )}
+            {(mode === 'lumpsum_deposit' || mode === 'hybrid_deposits') && (
+              <div style={{ marginBottom: 14 }}>
+                <label style={lS}>Lump Sum Deposit (ZMW) <span style={{ color: C.red }}>*</span></label>
+                <input type="number" min="0" placeholder="e.g. 30000" value={lumpsumDeposit} onChange={e => { setLumpsumDeposit(e.target.value); setResult(null); }} style={iS}
+                  onFocus={e => e.target.style.borderColor = C.red} onBlur={e => e.target.style.borderColor = C.gray200} />
+                {errors.lumpsum_deposit && <div style={{ fontSize: 11, color: C.red, marginTop: 3 }}>{errors.lumpsum_deposit}</div>}
+              </div>
+            )}
+            {mode === 'varying_monthly_deposits' && (
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 14 }}>
+                <div>
+                  <label style={lS}>Min Monthly (ZMW) <span style={{ color: C.red }}>*</span></label>
+                  <input type="number" min="0" placeholder="e.g. 2000" value={minMonthly} onChange={e => { setMinMonthly(e.target.value); setResult(null); }} style={iS}
+                    onFocus={e => e.target.style.borderColor = C.red} onBlur={e => e.target.style.borderColor = C.gray200} />
+                  {errors.minimum_monthly_deposit && <div style={{ fontSize: 11, color: C.red, marginTop: 3 }}>{errors.minimum_monthly_deposit}</div>}
+                </div>
+                <div>
+                  <label style={lS}>Max Monthly (ZMW) <span style={{ color: C.red }}>*</span></label>
+                  <input type="number" min="0" placeholder="e.g. 10000" value={maxMonthly} onChange={e => { setMaxMonthly(e.target.value); setResult(null); }} style={iS}
+                    onFocus={e => e.target.style.borderColor = C.red} onBlur={e => e.target.style.borderColor = C.gray200} />
+                  {errors.maximum_monthly_deposit && <div style={{ fontSize: 11, color: C.red, marginTop: 3 }}>{errors.maximum_monthly_deposit}</div>}
+                </div>
+              </div>
+            )}
 
-            <div style={{ marginBottom: 16 }}>
-              <div style={{ fontSize: 12, fontWeight: 600, color: C.gray600, marginBottom: 8 }}>Scenario</div>
-              {['historical', 'conservative', 'balanced', 'optimistic'].map(s => (
-                <label key={s} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6, cursor: 'pointer' }}>
-                  <div style={{
-                    width: 16, height: 16, borderRadius: '50%', border: `2px solid ${scenario === s ? C.red : C.gray300}`,
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  }}>
-                    {scenario === s && <div style={{ width: 8, height: 8, borderRadius: '50%', background: C.red }} />}
-                  </div>
-                  <span style={{ fontSize: 13, color: scenario === s ? C.gray900 : C.gray500, fontWeight: scenario === s ? 600 : 400, textTransform: 'capitalize' }} onClick={() => setScenario(s)}>{s === 'historical' ? 'Historical Trends' : s}</span>
-                </label>
-              ))}
-            </div>
+            {/* General errors */}
+            {errors.detail && (
+              <div style={{ padding: '10px 14px', borderRadius: 8, background: `${C.red}10`, border: `1px solid ${C.red}30`, marginBottom: 14 }}>
+                <p style={{ fontSize: 12, color: C.red, fontWeight: 600 }}>{errors.detail}</p>
+              </div>
+            )}
+            {errors.non_field_errors && (
+              <div style={{ padding: '10px 14px', borderRadius: 8, background: `${C.red}10`, border: `1px solid ${C.red}30`, marginBottom: 14 }}>
+                <p style={{ fontSize: 12, color: C.red, fontWeight: 600 }}>{Array.isArray(errors.non_field_errors) ? errors.non_field_errors[0] : errors.non_field_errors}</p>
+              </div>
+            )}
 
-            <button onClick={() => setCalculated(true)} style={{
+            {/* Submit */}
+            <button disabled={!canSubmit || submitting} onClick={handleSubmit} style={{
               display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-              width: '100%', padding: '12px 0', background: C.navy, color: C.white,
-              fontWeight: 700, fontSize: 14, borderRadius: 8, border: 'none', cursor: 'pointer',
-              fontFamily: font.sans,
+              width: '100%', padding: '12px 0',
+              background: (!canSubmit || submitting) ? C.gray300 : C.navy, color: C.white,
+              fontWeight: 700, fontSize: 14, borderRadius: 8, border: 'none',
+              cursor: (!canSubmit || submitting) ? 'not-allowed' : 'pointer',
+              fontFamily: font.sans, transition: 'all 0.2s',
             }}>
-              <Calculator size={16} /> Calculate
+              {submitting ? 'Running Simulation…' : 'Calculate Projection'} {!submitting && <Calculator size={16} />}
             </button>
           </div>
         </div>
 
-        {/* Results */}
+        {/* ── RIGHT: Results ── */}
         <div>
-          <div style={{
-            padding: '16px 20px', borderRadius: 10, marginBottom: 20,
-            background: `linear-gradient(135deg, ${C.red}, #E53E3E)`, color: C.white,
-          }}>
-            <div style={{ fontSize: 11, fontWeight: 600, opacity: 0.8, marginBottom: 4 }}>Projected Value Range</div>
-            <div style={{ fontFamily: font.serif, fontSize: 28, fontWeight: 800 }}>
-              K {Math.round(worstCase).toLocaleString()} – K {Math.round(bestCase).toLocaleString()}
+          {!result && !submitting && (
+            <div style={{ padding: 40, textAlign: 'center', color: C.gray400, borderRadius: 14, border: `2px dashed ${C.gray200}`, background: C.white }}>
+              <Calculator size={36} style={{ color: C.gray200, marginBottom: 12 }} />
+              <div style={{ fontSize: 15, fontWeight: 600, color: C.gray500, marginBottom: 6 }}>No Projection Yet</div>
+              <p style={{ fontSize: 13, color: C.gray400, lineHeight: 1.5 }}>Select a fund, projection mode, and enter your details to see estimated returns.</p>
             </div>
-          </div>
+          )}
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginBottom: 20 }}>
-            {[
-              { label: 'Median Value', value: `K ${Math.round(futureValue).toLocaleString()}` },
-              { label: 'Total Invested', value: `K ${Math.round(totalInvested).toLocaleString()}` },
-              { label: 'Best Case', value: `K ${Math.round(bestCase).toLocaleString()}` },
-            ].map(({ label, value }) => (
-              <div key={label} style={{ padding: 14, background: C.gray50, borderRadius: 10, border: `1px solid ${C.gray100}` }}>
-                <div style={{ fontSize: 11, color: C.gray400, fontWeight: 600, marginBottom: 4 }}>{label}</div>
-                <div style={{ fontSize: 16, fontWeight: 800, color: C.navy, fontFamily: font.serif }}>{value}</div>
+          {submitting && (
+            <div style={{ padding: 40, textAlign: 'center', color: C.gray400, borderRadius: 14, background: C.white, border: `1px solid ${C.gray100}` }}>
+              <Activity size={28} style={{ color: C.navy, marginBottom: 8 }} />
+              <div style={{ fontSize: 14, color: C.gray600 }}>Running Monte Carlo simulation…</div>
+              <p style={{ fontSize: 12, color: C.gray400, marginTop: 4 }}>{result?.number_of_simulations ? `${Number(result.number_of_simulations).toLocaleString()} scenarios` : 'Analysing market data'}</p>
+            </div>
+          )}
+
+          {result && !submitting && (
+            <div>
+              {/* Hero — Estimated Value Range */}
+              <div style={{
+                padding: '20px 24px', borderRadius: 14, marginBottom: 16,
+                background: `linear-gradient(135deg, ${C.navy}, ${C.navyDark})`, color: C.white,
+              }}>
+                <div style={{ fontSize: 11, fontWeight: 600, opacity: 0.7, marginBottom: 2 }}>Estimated Investment Value</div>
+                <div style={{ fontFamily: font.serif, fontSize: 28, fontWeight: 800, marginBottom: 12 }}>
+                  {fmtK(result.estimated_middle_value)}
+                </div>
+                <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+                  {[
+                    { label: 'Conservative', value: fmtK(result.estimated_low_value), color: '#FCA5A5' },
+                    { label: 'Expected', value: fmtK(result.estimated_middle_value), color: '#4ADE80' },
+                    { label: 'Optimistic', value: fmtK(result.estimated_high_value), color: '#93C5FD' },
+                  ].map(s => (
+                    <div key={s.label} style={{ flex: 1, minWidth: 100 }}>
+                      <div style={{ fontSize: 10, opacity: 0.6, marginBottom: 2 }}>{s.label}</div>
+                      <div style={{ fontSize: 16, fontWeight: 700, color: s.color }}>{s.value}</div>
+                    </div>
+                  ))}
+                </div>
               </div>
-            ))}
-          </div>
 
-          {/* Projection chart */}
-          <div style={{ height: 140, border: `1px solid ${C.gray100}`, borderRadius: 10, padding: 12, background: C.offWhite }}>
-            <MiniChart data={projChart} width={320} height={120} color={C.navy} />
-          </div>
+              {/* Gain + Return cards */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10, marginBottom: 16 }}>
+                {[
+                  { label: 'Estimated Gain', value: fmtK(result.estimated_middle_gain), color: C.green, sub: `${result.estimated_middle_return_percent}% return` },
+                  { label: 'Total Contribution', value: fmtK(result.average_total_contribution), color: C.navy, sub: `${result.tenure_months} months` },
+                  { label: 'Chance of Gain', value: `${result.chance_of_gain_percent}%`, color: C.green, sub: `${result.chance_of_loss_percent}% loss risk` },
+                ].map(s => (
+                  <div key={s.label} style={{ padding: '14px 12px', borderRadius: 12, background: C.white, border: `1px solid ${C.gray100}` }}>
+                    <div style={{ fontSize: 10, color: C.gray400, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 4 }}>{s.label}</div>
+                    <div style={{ fontSize: 18, fontWeight: 800, color: s.color, lineHeight: 1.1, marginBottom: 2 }}>{s.value}</div>
+                    <div style={{ fontSize: 10, color: C.gray400 }}>{s.sub}</div>
+                  </div>
+                ))}
+              </div>
 
-          <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
-            <button onClick={() => onNavigate && onNavigate('portal')} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '10px 18px', borderRadius: 6, border: 'none', background: C.red, color: C.white, cursor: 'pointer', fontFamily: font.sans, fontSize: 12, fontWeight: 700 }}>
-              Start Investing <ArrowRight size={14} />
-            </button>
-          </div>
+              {/* Detailed breakdown */}
+              <div style={{ padding: '16px 18px', borderRadius: 12, background: C.white, border: `1px solid ${C.gray100}`, marginBottom: 16 }}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: C.navy, textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 10 }}>Projection Details</div>
+                {[
+                  ['Fund', result.fund],
+                  ['Projection Type', result.projection_mode_label],
+                  ['Investment Period', `${result.tenure_months} months`],
+                  ['Simulations Run', Number(result.number_of_simulations).toLocaleString()],
+                  ['Starting Unit Price', `K ${Number(result.starting_unit_price).toFixed(4)}`],
+                  ['Est. Ending Unit Price', `K ${Number(result.estimated_ending_unit_price).toFixed(4)}`],
+                ].map(([label, value]) => (
+                  <div key={label} style={{ display: 'flex', justifyContent: 'space-between', padding: '5px 0', borderBottom: `1px solid ${C.gray50}` }}>
+                    <span style={{ fontSize: 12, color: C.gray500 }}>{label}</span>
+                    <span style={{ fontSize: 12, fontWeight: 600, color: C.gray800 }}>{value}</span>
+                  </div>
+                ))}
+              </div>
+
+              {/* Scenario comparison */}
+              <div style={{ padding: '16px 18px', borderRadius: 12, background: C.white, border: `1px solid ${C.gray100}`, marginBottom: 16 }}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: C.navy, textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 10 }}>Scenario Comparison</div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr 1fr 1fr', gap: 0 }}>
+                  {/* Header */}
+                  {['', 'Conservative', 'Expected', 'Optimistic'].map(h => (
+                    <div key={h} style={{ padding: '6px 8px', fontSize: 10, fontWeight: 700, color: C.gray400, textTransform: 'uppercase', borderBottom: `2px solid ${C.gray100}` }}>{h}</div>
+                  ))}
+                  {/* Rows */}
+                  {[
+                    ['Value', result.estimated_low_value, result.estimated_middle_value, result.estimated_high_value],
+                    ['Gain', result.estimated_low_gain, result.estimated_middle_gain, result.estimated_high_gain],
+                    ['Return', `${result.estimated_low_return_percent}%`, `${result.estimated_middle_return_percent}%`, `${result.estimated_high_return_percent}%`],
+                  ].map(([label, lo, mid, hi]) => (
+                    <React.Fragment key={label}>
+                      <div style={{ padding: '6px 8px', fontSize: 11, fontWeight: 600, color: C.gray600, borderBottom: `1px solid ${C.gray50}` }}>{label}</div>
+                      {[lo, mid, hi].map((v, i) => (
+                        <div key={i} style={{ padding: '6px 8px', fontSize: 11, fontWeight: 700, color: [C.red, C.green, C.navy][i], borderBottom: `1px solid ${C.gray50}`, textAlign: 'right' }}>
+                          {typeof v === 'number' ? fmtK(v) : v}
+                        </div>
+                      ))}
+                    </React.Fragment>
+                  ))}
+                </div>
+              </div>
+
+              {/* Explanation */}
+              {result.explanation && (
+                <div style={{ padding: '14px 18px', borderRadius: 12, background: `${C.navy}08`, border: `1px solid ${C.navy}15` }}>
+                  <p style={{ fontSize: 13, color: C.gray600, lineHeight: 1.6, fontStyle: 'italic' }}>{result.explanation}</p>
+                </div>
+              )}
+
+              {/* CTA */}
+              <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
+                <button onClick={() => onNavigate && onNavigate('portal')} style={{
+                  display: 'flex', alignItems: 'center', gap: 6, padding: '12px 22px', borderRadius: 8, border: 'none',
+                  background: C.red, color: C.white, cursor: 'pointer', fontFamily: font.sans, fontSize: 13, fontWeight: 700,
+                  transition: 'all 0.2s',
+                }}
+                  onMouseEnter={e => e.currentTarget.style.background = C.redHover}
+                  onMouseLeave={e => e.currentTarget.style.background = C.red}
+                >Start Investing <ArrowRight size={14} /></button>
+                <button onClick={() => { setResult(null); }} style={{
+                  display: 'flex', alignItems: 'center', gap: 6, padding: '12px 22px', borderRadius: 8,
+                  border: `1.5px solid ${C.gray200}`, background: 'transparent', color: C.gray600,
+                  cursor: 'pointer', fontFamily: font.sans, fontSize: 13, fontWeight: 600,
+                }}>New Projection</button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>
   );
 }
+
 
 /* ═══════════════════════════════════════════ */
 /*  INSIGHTS & MARKET DATA                    */
@@ -944,8 +1189,7 @@ function FundsTab({ isMobile }) {
 
   useEffect(() => {
     let cancelled = false;
-    fetch('/api/fund-performance-benchmark/')
-      .then(r => { if (!r.ok) throw new Error(r.status); return r.json(); })
+    cachedFetch('/api/fund-performance-benchmark/')
       .then(data => {
         if (cancelled) return;
         if (data && typeof data === 'object' && !Array.isArray(data)) {
@@ -1395,11 +1639,11 @@ function MarketSnapshotCards({ isMobile }) {
   useEffect(() => {
     let cancelled = false;
     Promise.allSettled([
-      fetch('/api/foreign-exchange/').then(r => { if (!r.ok) throw new Error(r.status); return r.json(); }),
-      fetch('/api/all-share-index-benchmark/').then(r => { if (!r.ok) throw new Error(r.status); return r.json(); }),
-      fetch('/api/monetary-policyrate-benchmark/').then(r => { if (!r.ok) throw new Error(r.status); return r.json(); }),
-      fetch('/api/inflation-rate-benchmark/').then(r => { if (!r.ok) throw new Error(r.status); return r.json(); }),
-      fetch('/api/grz-securities-benchmark/').then(r => { if (!r.ok) throw new Error(r.status); return r.json(); }),
+      cachedFetch('/api/foreign-exchange/'),
+      cachedFetch('/api/all-share-index-benchmark/'),
+      cachedFetch('/api/monetary-policyrate-benchmark/'),
+      cachedFetch('/api/inflation-rate-benchmark/'),
+      cachedFetch('/api/grz-securities-benchmark/'),
     ]).then(([fxRes, asiRes, mprRes, infRes, grzRes]) => {
       if (cancelled) return;
       const result = [];
@@ -1706,19 +1950,19 @@ function InsightsPage({ onNavigate }) {
 const boardOfDirectors = [
   { name: 'Chanda HJ Chileshe', role: 'Chairman', photo: '/images/team/ChandaChileshe.jpg', initials: 'CC', bio: 'Chanda is a seasoned lawyer and Managing Partner of Lloyd Jones & Collins with over 35 years experience in commercial and legal practice both locally and internationally. He holds a Bachelor of Arts – Joint Hons. in Law & Economics from the University of Keele as well as a Master of Laws Degree, LLM: Taxation, Insurance, Company Law from the University of London. He is a member of various professional bodies and has sat on various Boards including Finance Bank (Atlas Mara), Colgate Palmolive and the Revenue Appeals Tribunal, among others.' },
   { name: 'Banji Gideon Moono', role: 'Director, CFA', photo: '/images/team/BanjiMoono.jpeg', initials: 'BM', bio: 'Banji is a qualified and experienced Finance, Accounting, and Investment professional with extensive experience in Banking and Investments. He has served in senior management positions with various commercial banks including Finance Bank and most recently, the United Bank for Africa where he is currently serving as the Group Head-Investor Relations based in Nigeria. Banji is a qualified Chartered Management Accountant (CIMA) and holder of the prestigious CFA Charter. He holds a Diploma in Treasury Management and is also a fellow of the Zambia Institute of Chartered Accountants (ZICA).' },
-  { name: 'Dionysius Makunka', role: 'CEO, CFA', photo: '/images/team/DionysiusMakunka.jpg', initials: 'DM', bio: 'Dionysius is a qualified and experienced Economics and Finance professional with over twenty (20) years of practice with various institutions. He spent about twenty years at the Bank of Zambia where he served in senior management positions prior to going into private practice. He has also been involved in lecturing at the University of Zambia (Derivatives), ZIBFS (Investment Analysis & Portfolio Management) and the University of Lusaka (Risk Management). Dionysius is a Chartered Accountant (ACCA) and holds the prestigious CFA Charter. He also holds the Bachelor of Accountancy degree from the Copperbelt University as well as a Master of Science in Finance & Economics from Manchester University, UK.' },
+  { name: 'Dionysius Makunka', role: 'CEO, CFA', photo: '/images/team/DionysusMakunka.jpg', initials: 'DM', bio: 'Dionysius is a qualified and experienced Economics and Finance professional with over twenty (20) years of practice with various institutions. He spent about twenty years at the Bank of Zambia where he served in senior management positions prior to going into private practice. He has also been involved in lecturing at the University of Zambia (Derivatives), ZIBFS (Investment Analysis & Portfolio Management) and the University of Lusaka (Risk Management). Dionysius is a Chartered Accountant (ACCA) and holds the prestigious CFA Charter. He also holds the Bachelor of Accountancy degree from the Copperbelt University as well as a Master of Science in Finance & Economics from Manchester University, UK.' },
   { name: 'Namucana Musiwa', role: 'Director', photo: '/images/team/NamucanaMusiwa.jpg', initials: 'NM', bio: 'Namucana is an entrepreneur with extensive experience in governance and talent acquisition. She is the founder and CEO of Career Prospects Limited, one of the leading recruitment agencies in Zambia. She has served and continues to serve on various Boards including the Zambia Qualification Authority, Zambia Institute of Human Resources Management, Professional Insurance Corporation and the University of Zambia Council, Bank of Zambia REMCO, Zambia National Building Society REMCO, among others. Namucana holds a Bachelor of Arts in Public Administration and Economics obtained from the University of Zambia.' },
-  { name: 'Andrew John Kangwa', role: 'Investment Committee Member', photo: '/images/team/Andrew.jpeg', initials: 'AK', bio: 'Andrew is an experienced finance professional and entrepreneur. Having spent several years working in the Finance division of mining group, First Quantum Mining Plc, he set up private enterprises focused on diversified sectors. Among other qualifications, he holds a Master of Business Administration (MBA).' },
-  { name: 'Pathias Paupila', role: 'Director', photo: '/images/team/Pathius.jpeg', initials: 'PP', bio: 'Pathias is a qualified and experienced Legal, Credit, Risk and Compliance professional with extensive exposure to managing complex risk processes gained in several institutions for over 18 years. He possesses extensive experience in the allocation of capital to Small and Medium Enterprises (SMEs). Pathias also Chairs the Risk and Compliance Committee of Longhorn Associates Limited. He holds a Master of Science degree in Risk Management, a Bachelor of Laws degree and a Bachelor of Business Administration degree.' },
+  { name: 'Andrew John Kangwa', role: 'Investment Committee Member', photo: null, initials: 'AK', bio: 'Andrew is an experienced finance professional and entrepreneur. Having spent several years working in the Finance division of mining group, First Quantum Mining Plc, he set up private enterprises focused on diversified sectors. Among other qualifications, he holds a Master of Business Administration (MBA).' },
+  { name: 'Pathias Paupila', role: 'Director', photo: null, initials: 'PP', bio: 'Pathias is a qualified and experienced Legal, Credit, Risk and Compliance professional with extensive exposure to managing complex risk processes gained in several institutions for over 18 years. He possesses extensive experience in the allocation of capital to Small and Medium Enterprises (SMEs). Pathias also Chairs the Risk and Compliance Committee of Longhorn Associates Limited. He holds a Master of Science degree in Risk Management, a Bachelor of Laws degree and a Bachelor of Business Administration degree.' },
 ];
 
 const managementTeam = [
-  { name: 'Dionysius Makunka', role: 'CEO, CFA', photo: '/images/team/DionysiusMakunka.jpg', initials: 'DM', bio: 'Dionysius is a qualified and experienced Economics and Finance professional with over twenty (20) years of practice with various institutions. He spent about twenty years at the Bank of Zambia where he served in senior management positions prior to going into private practice. Dionysius is a Chartered Accountant (ACCA) and holds the prestigious CFA Charter.' },
+  { name: 'Dionysius Makunka', role: 'CEO, CFA', photo: '/images/team/DionysusMakunka.jpg', initials: 'DM', bio: 'Dionysius is a qualified and experienced Economics and Finance professional with over twenty (20) years of practice with various institutions. He spent about twenty years at the Bank of Zambia where he served in senior management positions prior to going into private practice. Dionysius is a Chartered Accountant (ACCA) and holds the prestigious CFA Charter.' },
   { name: 'Brian Chilufya Chintu', role: 'Chief Investments & Operations Officer', photo: '/images/team/BrianChilufyaChintu.JPG', initials: 'BC', bio: 'Brian is a qualified and experienced Finance and Investments professional with experience in management of assorted investment portfolios including Pension Funds and Collective Investments. He has specialized in Investments during his time with the Madison Group where he served in various portfolios in Finance and Investments. More recently he served as Commercial Services Director at Zambia Airports Corporation. He comes with a wealth of experience with particular focus in Corporate Finance, Investments and Accounting.' },
   { name: 'Marlon Nsofu', role: 'Chief Systems & Data Analytics Officer', photo: '/images/team/MarlonNsofu.jpg', initials: 'MN', bio: 'Marlon is an investment professional with over fourteen years of experience in managing pension funds and collective investment schemes. His expertise spans across money markets, capital markets, and other key economic sectors. He has earned certifications in computer science and data science, which he leverages to enhance his work in quantitative finance and financial engineering. He holds a bachelor\'s degree in finance from the Robert H. Smith School of Business at the University of Maryland, USA.' },
   { name: 'Izukanji Nachiza Mwanza', role: 'CFO', photo: '/images/team/IzukanjiMwanza.jpg', initials: 'IM', bio: 'Izukanji started her accounting career with AMO Chartered Accountants in 2011 where she worked as a Management Trainee. She later worked at various institutions in the Finance and Accounting role. Prior to her accounting career, she pursued a diploma in Chemical Engineering at the Copperbelt University. Izukanji is a Chartered Accountant and holder of the ACCA qualification. She is also a member of both ACCA and ZICA.' },
   { name: 'Lewis Mwale', role: 'Chief Partnerships Officer', photo: '/images/team/lewis.jpg', initials: 'LM', bio: 'Lewis is a qualified Social Security Expert and Financial Advisor with over 7 years work experience in the Pensions Industry in Zambia. He holds a Bachelor\'s Degree in Business Administration from the Copperbelt University and is currently pursuing a Master of Business Administration (MBA) - Finance. Prior to joining Longhorn, Lewis worked as a Financial Controller for Innscor Zambia Limited and as a Credit and Debt Analyst for Vision Fund Zambia.' },
-  { name: 'Patrick Edward Zulu', role: 'Chief Credit Operations & Fintech Officer', photo: '/images/team/Patrick.jpeg', initials: 'PZ', bio: 'Patrick is a seasoned Certified Credit Professional and management specialist with a proven record of building and leading diverse teams. He holds an MBA in Accounting and Finance from the University of Liverpool and a BA with a bias in Economics from the University of Zambia. With more than 18 years of experience, Patrick has worked across credit risk, strategic planning, human resource management and change management at leading institutions including Bayport Financial Services and Micro Finance Zambia Limited.' },
+  { name: 'Patrick Edward Zulu', role: 'Chief Credit Operations & Fintech Officer', photo: null, initials: 'PZ', bio: 'Patrick is a seasoned Certified Credit Professional and management specialist with a proven record of building and leading diverse teams. He holds an MBA in Accounting and Finance from the University of Liverpool and a BA with a bias in Economics from the University of Zambia. With more than 18 years of experience, Patrick has worked across credit risk, strategic planning, human resource management and change management at leading institutions including Bayport Financial Services and Micro Finance Zambia Limited.' },
 ];
 
 /* ── Team Member Card ── */
@@ -2193,17 +2437,67 @@ function ContactPage() {
 
 /* ═══════════════════════════════════════════ */
 /*  PORTAL PAGE — Login + Onboarding Wizard    */
-/*  7 lookup APIs, 3 products, 2 applicant     */
-/*  types, FormData with bracket notation      */
+/*  Lookup APIs, conditional KYC, FormData     */
+/*  submission per Unit Trust Build Guide      */
 /* ═══════════════════════════════════════════ */
 
-/* ── Shared form styles ── */
+/* ── Shared form styles (module-level) ── */
 const portalStyles = {
   input: { width: '100%', padding: '10px 14px', borderRadius: 8, border: `1.5px solid ${C.gray200}`, fontSize: 13, fontFamily: font.sans, outline: 'none', color: C.gray800, background: C.white },
   label: { display: 'block', fontSize: 11, fontWeight: 600, color: C.gray600, marginBottom: 4 },
-  section: { marginBottom: 20 },
   grid2: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 },
 };
+
+/* ── InputField — MUST be outside PortalRegister to avoid focus loss ── */
+function PortalInputField({ label, name, type = 'text', required, placeholder, value, onChange, options, error, fieldErr }) {
+  const S = portalStyles;
+  const resolvedErr = error || (fieldErr ? fieldErr(`mainKycForm.${name}`) : null);
+  return (
+    <div style={{ marginBottom: 12 }}>
+      <label style={S.label}>{label} {required && <span style={{ color: C.red }}>*</span>}</label>
+      {options ? (
+        <select value={value || ''} onChange={e => onChange(e.target.value)} style={{ ...S.input, background: C.white }}>
+          <option value="">Select…</option>
+          {options.map(o => {
+            const val = typeof o === 'object' ? (o.value || o.id || o.name || o.label) : o;
+            const display = typeof o === 'object' ? (o.name || o.label || o.value || o.id) : o;
+            return <option key={val} value={val}>{display}</option>;
+          })}
+        </select>
+      ) : (
+        <input type={type} placeholder={placeholder} value={value || ''} onChange={e => onChange(e.target.value)} style={S.input}
+          onFocus={e => e.target.style.borderColor = C.red} onBlur={e => e.target.style.borderColor = C.gray200} />
+      )}
+      {resolvedErr && <div style={{ fontSize: 11, color: C.red, marginTop: 3 }}>{resolvedErr}</div>}
+    </div>
+  );
+}
+
+/* ── FileField — MUST be outside PortalRegister to avoid focus loss ── */
+function PortalFileField({ label, name, required, hint, file, onFileChange, fieldErr }) {
+  const S = portalStyles;
+  const resolvedErr = fieldErr ? fieldErr(`mainKycForm.${name}`) : null;
+  return (
+    <div style={{ marginBottom: 12 }}>
+      <label style={S.label}>{label} {required && <span style={{ color: C.red }}>*</span>} {hint && <span style={{ color: C.gray400, fontWeight: 400 }}>({hint})</span>}</label>
+      <div style={{
+        padding: '12px 16px', borderRadius: 10, border: `1.5px dashed ${file ? C.green : C.gray300}`,
+        background: file ? `${C.green}08` : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        transition: 'all 0.2s', cursor: 'pointer', position: 'relative',
+      }}>
+        <div>
+          <div style={{ fontSize: 13, fontWeight: 600, color: file ? C.green : C.gray700 }}>
+            {file ? file.name : 'Choose file…'}
+          </div>
+          {!file && <div style={{ fontSize: 11, color: C.gray400, marginTop: 2 }}>PDF, JPG, or PNG (max 5MB)</div>}
+        </div>
+        <div style={{ fontSize: 11, fontWeight: 700, color: file ? C.green : C.red }}>{file ? '✓ Uploaded' : '+ Upload'}</div>
+        <input type="file" accept=".pdf,.jpg,.jpeg,.png" onChange={e => onFileChange(name, e.target.files[0])} style={{ position: 'absolute', inset: 0, opacity: 0, cursor: 'pointer' }} />
+      </div>
+      {resolvedErr && <div style={{ fontSize: 11, color: C.red, marginTop: 3 }}>{resolvedErr}</div>}
+    </div>
+  );
+}
 
 function PortalPage() {
   const [tab, setTab] = useState('login');
@@ -2211,15 +2505,12 @@ function PortalPage() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', minHeight: 'calc(100vh - 64px)', background: C.offWhite }}>
-      {/* Header */}
       <div style={{ background: HEADER_GRADIENT, padding: isMobile ? '24px 20px' : '32px 60px', textAlign: 'center' }}>
         <div style={{ fontFamily: font.serif, fontSize: 26, fontWeight: 800, color: C.white, marginBottom: 4 }}>
           <span style={{ color: '#FFD0D5' }}>SIMP</span> Invest
         </div>
         <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)' }}>Secure Investor Management Portal</p>
       </div>
-
-      {/* Tab toggle */}
       <div style={{ display: 'flex', justifyContent: 'center', padding: '20px 20px 0' }}>
         <div style={{ display: 'flex', background: C.gray50, borderRadius: 10, padding: 3, width: isMobile ? '100%' : 360 }}>
           {['login', 'register'].map(t => (
@@ -2227,24 +2518,19 @@ function PortalPage() {
               flex: 1, padding: '10px 0', borderRadius: 8, border: 'none', cursor: 'pointer',
               fontFamily: font.sans, fontWeight: 600, fontSize: 14,
               background: tab === t ? C.navy : 'transparent',
-              color: tab === t ? C.white : C.gray400,
-              transition: 'all 0.2s',
+              color: tab === t ? C.white : C.gray400, transition: 'all 0.2s',
             }}>{t === 'login' ? 'Sign In' : 'Register'}</button>
           ))}
         </div>
       </div>
-
-      {/* Content */}
       <div style={{ flex: 1, padding: isMobile ? '20px 16px' : '24px 60px', maxWidth: tab === 'login' ? 480 : 720, margin: '0 auto', width: '100%' }}>
         {tab === 'login' ? <PortalLogin /> : <PortalRegister isMobile={isMobile} />}
       </div>
-
       <p style={{ textAlign: 'center', fontSize: 10, color: C.gray400, padding: '12px 0' }}>256-bit SSL · Regulated by SEC & PIA Zambia</p>
     </div>
   );
 }
 
-/* ── Login Tab (redirect) ── */
 function PortalLogin() {
   return (
     <div style={{ background: C.white, borderRadius: 16, padding: 32, boxShadow: '0 4px 20px rgba(0,0,0,0.06)', textAlign: 'center', marginTop: 8 }}>
@@ -2253,7 +2539,7 @@ function PortalLogin() {
       </div>
       <h3 style={{ fontFamily: font.serif, fontSize: 20, fontWeight: 700, color: C.gray900, marginBottom: 8 }}>Sign In to Your Account</h3>
       <p style={{ fontSize: 14, color: C.gray500, lineHeight: 1.6, marginBottom: 20 }}>Access your SIMP Invest portal to manage your investments, track performance, and view your portfolio.</p>
-      <a href="https://longsmart.longhorn-associates.com/web/login" target="_blank" rel="noopener noreferrer" style={{
+      <a href="https://online.longhorn-associates.com/auth/login" target="_blank" rel="noopener noreferrer" style={{
         display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
         width: '100%', padding: '14px 0', background: C.red, color: C.white,
         fontWeight: 700, fontSize: 14, borderRadius: 8, textDecoration: 'none',
@@ -2267,7 +2553,6 @@ function PortalLogin() {
   );
 }
 
-/* ── Registration Wizard ── */
 function PortalRegister({ isMobile }) {
   const S = portalStyles;
   const [step, setStep] = useState(1);
@@ -2275,24 +2560,21 @@ function PortalRegister({ isMobile }) {
   const [success, setSuccess] = useState(null);
   const [errors, setErrors] = useState({});
 
-  /* Lookups */
   const [lookups, setLookups] = useState(null);
   const [lookupErr, setLookupErr] = useState(false);
 
-  /* Form state */
   const [product, setProduct] = useState('');
   const [applicantType, setApplicantType] = useState('');
   const [kyc, setKyc] = useState({});
   const [files, setFiles] = useState({});
   const [unitTrust, setUnitTrust] = useState({ fundName: '', beneficiary: false, beneficiaryName: '', relationshipWithBeneficiary: '', beneficiaryDOB: '' });
-  const [credit, setCredit] = useState({ loanAmount: '', loanType: '' });
+  const [credit, setCredit] = useState({ loanType: '', loanAmount: '' });
 
-  /* Fetch all 7 lookups on mount */
   useEffect(() => {
     let cancelled = false;
     const endpoints = ['products', 'applicant-types', 'nationalities', 'genders', 'funds', 'loan-types', 'sales-people'];
     Promise.allSettled(
-      endpoints.map(ep => fetch(`/api/onboarding/lookups/${ep}/`).then(r => { if (!r.ok) throw new Error(r.status); return r.json(); }))
+      endpoints.map(ep => cachedFetch(`/api/onboarding/lookups/${ep}/`))
     ).then(results => {
       if (cancelled) return;
       const data = {};
@@ -2300,11 +2582,8 @@ function PortalRegister({ isMobile }) {
         const key = ep.replace(/-([a-z])/g, (_, c) => c.toUpperCase());
         data[key] = results[i].status === 'fulfilled' ? (Array.isArray(results[i].value) ? results[i].value : results[i].value.results || []) : [];
       });
-      if (Object.values(data).every(v => v.length === 0)) {
-        setLookupErr(true);
-      } else {
-        setLookups(data);
-      }
+      if (Object.values(data).every(v => v.length === 0)) setLookupErr(true);
+      else setLookups(data);
     });
     return () => { cancelled = true; };
   }, []);
@@ -2315,12 +2594,12 @@ function PortalRegister({ isMobile }) {
 
   const isIndividual = applicantType === 'Individual';
   const isCompany = applicantType === 'Company';
-  const isUnitTrust = product === 'Unit Trust';
-  const isCredit = product === 'Credit Application';
-  const isStockBroking = product === 'Stock Broking';
+  const isUnitTrust = (product || '').replace(/\s/g, '').toLowerCase().includes('unittrust');
+  const isCredit = (product || '').replace(/\s/g, '').toLowerCase().includes('credit');
+  const isStockBroking = (product || '').replace(/\s/g, '').toLowerCase().includes('stock');
 
-  /* Simple field-level errors */
-  const fieldErr = (fieldPath) => {
+  /* Nested error accessor */
+  const fieldErr = useCallback((fieldPath) => {
     if (!errors || typeof errors !== 'object') return null;
     const parts = fieldPath.split('.');
     let val = errors;
@@ -2331,23 +2610,41 @@ function PortalRegister({ isMobile }) {
     if (Array.isArray(val)) return val[0];
     if (typeof val === 'string') return val;
     return null;
-  };
+  }, [errors]);
 
-  /* ── SUBMIT ── */
+  /* ── SUBMIT — follows guide §16 exactly ── */
   const handleSubmit = async () => {
     setSubmitting(true);
     setErrors({});
     const fd = new FormData();
+
+    /* 1. Top-level fields */
     fd.append('product', product);
     fd.append('applicantType', applicantType);
 
-    /* KYC fields */
-    Object.entries(kyc).forEach(([k, v]) => { if (v !== '' && v != null) fd.append(`mainKycForm[${k}]`, v); });
+    /* 2. All mainKycForm fields — only append fields that have values */
+    const kycFields = isIndividual
+      ? ['firstName','middleName','lastName','emailAddress','phoneNumber','DOB','gender','nationality',
+         'IDNumber','IDType','physicalAddress','employer','employeeNumber','sourceOfIncome','salesPerson',
+         'bankName','bankAccountNumber','bankAccountName','bankBranchName',
+         'nextOfKin','nextOfKinPhone','relationshipWithNextOfKin']
+      : ['companyName','companyIDNumber','contactPerson','contactPersonPhone','contactPersonEmail',
+         'emailAddress','phoneNumber','nationality','IDType','physicalAddress','salesPerson',
+         'bankName','bankAccountNumber','bankAccountName','bankBranchName'];
 
-    /* Files */
-    Object.entries(files).forEach(([k, f]) => { if (f) fd.append(`mainKycForm[${k}]`, f); });
+    kycFields.forEach(k => {
+      const v = kyc[k];
+      if (v !== undefined && v !== null && v !== '') fd.append(`mainKycForm[${k}]`, v);
+    });
+    fd.append('mainKycForm[declaration]', kyc.declaration === 'true' ? 'true' : 'false');
 
-    /* Product-specific */
+    /* 3. Files — only when selected */
+    if (files.copyOfId) fd.append('mainKycForm[copyOfId]', files.copyOfId);
+    if (files.passportSizePhoto) fd.append('mainKycForm[passportSizePhoto]', files.passportSizePhoto);
+    if (files.proofOfResidence) fd.append('mainKycForm[proofOfResidence]', files.proofOfResidence);
+    if (files.referenceLetter) fd.append('mainKycForm[referenceLetter]', files.referenceLetter);
+
+    /* 4. Unit Trust account request */
     if (isUnitTrust) {
       fd.append('unitTrustApplication[accountRequests][0][fundName]', unitTrust.fundName);
       fd.append('unitTrustApplication[accountRequests][0][beneficiary]', String(unitTrust.beneficiary));
@@ -2357,17 +2654,28 @@ function PortalRegister({ isMobile }) {
         fd.append('unitTrustApplication[accountRequests][0][beneficiaryDOB]', unitTrust.beneficiaryDOB);
       }
     }
+
+    /* 5. Credit application */
     if (isCredit) {
-      fd.append('loanApplication[loanAmount]', credit.loanAmount);
-      fd.append('loanApplication[loanType]', credit.loanType);
+      if (credit.loanType) fd.append('loanApplication[loanType]', credit.loanType);
+      if (credit.loanAmount) fd.append('loanApplication[loanAmount]', credit.loanAmount);
     }
 
     try {
+      /* Debug: log all FormData entries (remove after testing) */
+      console.log('=== SUBMISSION DEBUG ===');
+      for (const [key, val] of fd.entries()) {
+        console.log(`  ${key}:`, val instanceof File ? `[File: ${val.name}]` : val);
+      }
+
       /* Product-specific registration endpoints */
       const registerUrls = {
         'Unit Trust': '/api/onboarding/register/unit-trust/',
+        'UnitTrust': '/api/onboarding/register/unit-trust/',
         'Credit Application': '/api/onboarding/register/credit-application/',
+        'CreditApplication': '/api/onboarding/register/credit-application/',
         'Stock Broking': '/api/onboarding/register/stock-broking/',
+        'StockBroking': '/api/onboarding/register/stock-broking/',
       };
       const url = registerUrls[product];
       if (!url) { setErrors({ _general: 'Unknown product selected.' }); setSubmitting(false); return; }
@@ -2376,8 +2684,8 @@ function PortalRegister({ isMobile }) {
       if (res.ok) {
         setSuccess(data);
       } else {
+        console.log('=== BACKEND ERRORS ===', JSON.stringify(data, null, 2));
         setErrors(data);
-        /* Jump to the step most likely to have errors */
         if (data.mainKycForm) setStep(2);
         else if (data.unitTrustApplication || data.loanApplication) setStep(3);
       }
@@ -2387,7 +2695,11 @@ function PortalRegister({ isMobile }) {
     setSubmitting(false);
   };
 
-  /* ── Loading / Error states ── */
+  /* Shorthand for InputField with common props */
+  const IF = (props) => <PortalInputField {...props} fieldErr={fieldErr} />;
+  const FF = (props) => <PortalFileField {...props} file={files[props.name]} onFileChange={fileUpdate} fieldErr={fieldErr} />;
+
+  /* ── Loading / Error / Success states ── */
   if (lookupErr) {
     return (
       <div style={{ background: C.white, borderRadius: 16, padding: 32, textAlign: 'center', marginTop: 8 }}>
@@ -2403,8 +2715,6 @@ function PortalRegister({ isMobile }) {
       </div>
     );
   }
-
-  /* ── Success state ── */
   if (success) {
     return (
       <div style={{ background: C.white, borderRadius: 16, padding: 40, textAlign: 'center', marginTop: 8, boxShadow: '0 4px 20px rgba(0,0,0,0.06)' }}>
@@ -2412,23 +2722,17 @@ function PortalRegister({ isMobile }) {
           <CheckCircle size={32} style={{ color: C.green }} />
         </div>
         <h3 style={{ fontFamily: font.serif, fontSize: 22, fontWeight: 700, color: C.gray900, marginBottom: 8 }}>Application Submitted!</h3>
-        <p style={{ fontSize: 14, color: C.gray500, marginBottom: 20, lineHeight: 1.6 }}>Your onboarding application has been received and is being processed.</p>
+        <p style={{ fontSize: 14, color: C.gray500, marginBottom: 20, lineHeight: 1.6 }}>Your onboarding application has been received.</p>
         <div style={{ display: 'inline-flex', flexDirection: 'column', gap: 8, padding: '16px 28px', borderRadius: 12, background: C.gray50, border: `1px solid ${C.gray100}`, marginBottom: 20, textAlign: 'left' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 24 }}>
-            <span style={{ fontSize: 12, color: C.gray400, fontWeight: 600 }}>Reference</span>
-            <span style={{ fontSize: 14, fontWeight: 700, color: C.navy }}>{success.reference}</span>
-          </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 24 }}>
-            <span style={{ fontSize: 12, color: C.gray400, fontWeight: 600 }}>Status</span>
-            <span style={{ fontSize: 13, fontWeight: 600, color: C.green }}>{success.status}</span>
-          </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 24 }}>
-            <span style={{ fontSize: 12, color: C.gray400, fontWeight: 600 }}>Product</span>
-            <span style={{ fontSize: 13, color: C.gray700 }}>{success.productName}</span>
-          </div>
+          {[['Reference', success.reference], ['Status', success.status], ['Product', success.productName], ['Type', success.applicantTypeName]].map(([l, v]) => v && (
+            <div key={l} style={{ display: 'flex', justifyContent: 'space-between', gap: 24 }}>
+              <span style={{ fontSize: 12, color: C.gray400, fontWeight: 600 }}>{l}</span>
+              <span style={{ fontSize: 13, fontWeight: 700, color: l === 'Status' ? C.green : C.navy }}>{v}</span>
+            </div>
+          ))}
         </div>
         <div>
-          <button onClick={() => { setSuccess(null); setStep(1); setProduct(''); setApplicantType(''); setKyc({}); setFiles({}); setUnitTrust({ fundName: '', beneficiary: false, beneficiaryName: '', relationshipWithBeneficiary: '', beneficiaryDOB: '' }); setCredit({ loanAmount: '', loanType: '' }); }} style={{
+          <button onClick={() => { setSuccess(null); setStep(1); setProduct(''); setApplicantType(''); setKyc({}); setFiles({}); setUnitTrust({ fundName: '', beneficiary: false, beneficiaryName: '', relationshipWithBeneficiary: '', beneficiaryDOB: '' }); setCredit({ loanType: '', loanAmount: '' }); }} style={{
             padding: '12px 28px', background: C.navy, color: C.white, fontWeight: 700, fontSize: 14,
             borderRadius: 8, border: 'none', cursor: 'pointer', fontFamily: font.sans,
           }}>Submit Another Application</button>
@@ -2437,49 +2741,7 @@ function PortalRegister({ isMobile }) {
     );
   }
 
-  /* ── Render helpers ── */
-  const InputField = ({ label, name, type = 'text', required, placeholder, value, onChange, options, error }) => (
-    <div style={{ marginBottom: 12 }}>
-      <label style={S.label}>{label} {required && <span style={{ color: C.red }}>*</span>}</label>
-      {options ? (
-        <select value={value || ''} onChange={e => onChange(e.target.value)} style={{ ...S.input, background: C.white }}>
-          <option value="">Select…</option>
-          {options.map(o => {
-            const val = typeof o === 'object' ? (o.name || o.label || o.id) : o;
-            const display = typeof o === 'object' ? (o.name || o.label || o.id) : o;
-            return <option key={val} value={val}>{display}</option>;
-          })}
-        </select>
-      ) : (
-        <input type={type} placeholder={placeholder} value={value || ''} onChange={e => onChange(e.target.value)} style={S.input}
-          onFocus={e => e.target.style.borderColor = C.red} onBlur={e => e.target.style.borderColor = C.gray200} />
-      )}
-      {(error || fieldErr(`mainKycForm.${name}`)) && <div style={{ fontSize: 11, color: C.red, marginTop: 3 }}>{error || fieldErr(`mainKycForm.${name}`)}</div>}
-    </div>
-  );
-
-  const FileField = ({ label, name, required, hint }) => (
-    <div style={{ marginBottom: 12 }}>
-      <label style={S.label}>{label} {required && <span style={{ color: C.red }}>*</span>} {hint && <span style={{ color: C.gray400, fontWeight: 400 }}>({hint})</span>}</label>
-      <div style={{
-        padding: '12px 16px', borderRadius: 10, border: `1.5px dashed ${files[name] ? C.green : C.gray300}`,
-        background: files[name] ? `${C.green}08` : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        transition: 'all 0.2s', cursor: 'pointer', position: 'relative',
-      }}>
-        <div>
-          <div style={{ fontSize: 13, fontWeight: 600, color: files[name] ? C.green : C.gray700 }}>
-            {files[name] ? files[name].name : 'Choose file…'}
-          </div>
-          {!files[name] && <div style={{ fontSize: 11, color: C.gray400, marginTop: 2 }}>PDF, JPG, or PNG (max 5MB)</div>}
-        </div>
-        <div style={{ fontSize: 11, fontWeight: 700, color: files[name] ? C.green : C.red }}>{files[name] ? '✓ Uploaded' : '+ Upload'}</div>
-        <input type="file" accept=".pdf,.jpg,.jpeg,.png" onChange={e => fileUpdate(name, e.target.files[0])} style={{ position: 'absolute', inset: 0, opacity: 0, cursor: 'pointer' }} />
-      </div>
-      {fieldErr(`mainKycForm.${name}`) && <div style={{ fontSize: 11, color: C.red, marginTop: 3 }}>{fieldErr(`mainKycForm.${name}`)}</div>}
-    </div>
-  );
-
-  /* ═══ WIZARD STEPS ═══ */
+  /* ═══ WIZARD ═══ */
   return (
     <div style={{ background: C.white, borderRadius: 16, padding: isMobile ? 20 : 32, boxShadow: '0 4px 20px rgba(0,0,0,0.06)', marginTop: 8 }}>
       {/* Progress bar */}
@@ -2497,7 +2759,6 @@ function PortalRegister({ isMobile }) {
         </div>
       </div>
 
-      {/* General error */}
       {errors._general && (
         <div style={{ padding: '10px 14px', borderRadius: 8, background: `${C.red}10`, border: `1px solid ${C.red}30`, marginBottom: 16 }}>
           <p style={{ fontSize: 12, color: C.red, fontWeight: 600 }}>{errors._general}</p>
@@ -2507,15 +2768,15 @@ function PortalRegister({ isMobile }) {
       {/* ─── STEP 1: Product & Applicant Type ─── */}
       {step === 1 && (
         <div>
-          <InputField label="Product" name="product" required options={lookups.products} value={product} onChange={v => { setProduct(v); setKyc({}); setFiles({}); }} />
-          <InputField label="Applicant Type" name="applicantType" required options={lookups.applicantTypes} value={applicantType} onChange={v => { setApplicantType(v); setKyc({}); }} />
+          {IF({ label: 'Product', name: 'product', required: true, options: lookups.products, value: product, onChange: v => { setProduct(v); setKyc({}); setFiles({}); } })}
+          {IF({ label: 'Applicant Type', name: 'applicantType', required: true, options: lookups.applicantTypes, value: applicantType, onChange: v => { setApplicantType(v); setKyc({}); } })}
           {product && applicantType && (
             <div style={{ padding: '12px 16px', borderRadius: 10, background: C.gray50, border: `1px solid ${C.gray100}`, marginTop: 12, marginBottom: 16 }}>
               <p style={{ fontSize: 12, color: C.gray600 }}>
                 You are applying for <b style={{ color: C.navy }}>{product}</b> as {applicantType === 'Individual' ? 'an' : 'a'} <b style={{ color: C.navy }}>{applicantType}</b>.
-                {isStockBroking && ' Only KYC information is required for this product.'}
-                {isUnitTrust && ' You will also select a fund and optionally add a beneficiary.'}
-                {isCredit && ' You will also provide loan details.'}
+                {isUnitTrust && ' You will select a fund and optionally add a beneficiary.'}
+                {isCredit && ' You will also select a loan type.'}
+                {isStockBroking && ' Only KYC information and documents are required.'}
               </p>
             </div>
           )}
@@ -2533,87 +2794,91 @@ function PortalRegister({ isMobile }) {
         <div>
           {isIndividual && (
             <>
+              <div style={{ fontSize: 12, fontWeight: 700, color: C.navy, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 10 }}>Personal Details</div>
               <div style={S.grid2}>
-                <InputField label="First Name" name="firstName" required value={kyc.firstName} onChange={v => kycUpdate('firstName', v)} />
-                <InputField label="Middle Name" name="middleName" value={kyc.middleName} onChange={v => kycUpdate('middleName', v)} />
+                {IF({ label: 'First Name', name: 'firstName', required: true, value: kyc.firstName, onChange: v => kycUpdate('firstName', v) })}
+                {IF({ label: 'Middle Name', name: 'middleName', value: kyc.middleName, onChange: v => kycUpdate('middleName', v) })}
               </div>
-              <InputField label="Last Name" name="lastName" required value={kyc.lastName} onChange={v => kycUpdate('lastName', v)} />
+              {IF({ label: 'Last Name', name: 'lastName', required: true, value: kyc.lastName, onChange: v => kycUpdate('lastName', v) })}
               <div style={S.grid2}>
-                <InputField label="Email Address" name="emailAddress" type="email" required value={kyc.emailAddress} onChange={v => kycUpdate('emailAddress', v)} />
-                <InputField label="Phone Number" name="phoneNumber" required placeholder="+260 97..." value={kyc.phoneNumber} onChange={v => kycUpdate('phoneNumber', v)} />
+                {IF({ label: 'Date of Birth', name: 'DOB', type: 'date', required: true, value: kyc.DOB, onChange: v => kycUpdate('DOB', v) })}
+                {IF({ label: 'Gender', name: 'gender', required: true, options: lookups.genders, value: kyc.gender, onChange: v => kycUpdate('gender', v) })}
+              </div>
+              {IF({ label: 'Nationality', name: 'nationality', required: true, options: lookups.nationalities, value: kyc.nationality, onChange: v => kycUpdate('nationality', v) })}
+
+              <div style={{ fontSize: 12, fontWeight: 700, color: C.navy, textTransform: 'uppercase', letterSpacing: '0.05em', marginTop: 16, marginBottom: 10 }}>Contact Details</div>
+              <div style={S.grid2}>
+                {IF({ label: 'Email Address', name: 'emailAddress', type: 'email', required: true, value: kyc.emailAddress, onChange: v => kycUpdate('emailAddress', v) })}
+                {IF({ label: 'Phone Number', name: 'phoneNumber', required: true, placeholder: '+260 97...', value: kyc.phoneNumber, onChange: v => kycUpdate('phoneNumber', v) })}
+              </div>
+              {IF({ label: 'Physical Address', name: 'physicalAddress', required: true, value: kyc.physicalAddress, onChange: v => kycUpdate('physicalAddress', v) })}
+
+              <div style={{ fontSize: 12, fontWeight: 700, color: C.navy, textTransform: 'uppercase', letterSpacing: '0.05em', marginTop: 16, marginBottom: 10 }}>Identification</div>
+              <div style={S.grid2}>
+                {IF({ label: 'ID Type', name: 'IDType', required: true, options: ['NRC', 'Passport', "Driver's License"], value: kyc.IDType, onChange: v => kycUpdate('IDType', v) })}
+                {IF({ label: 'ID Number', name: 'IDNumber', required: true, placeholder: 'e.g. 123456/10/1', value: kyc.IDNumber, onChange: v => kycUpdate('IDNumber', v) })}
+              </div>
+
+              <div style={{ fontSize: 12, fontWeight: 700, color: C.navy, textTransform: 'uppercase', letterSpacing: '0.05em', marginTop: 16, marginBottom: 10 }}>Employment & Source of Funds</div>
+              <div style={S.grid2}>
+                {IF({ label: 'Employer', name: 'employer', value: kyc.employer, onChange: v => kycUpdate('employer', v) })}
+                {IF({ label: 'Employee Number', name: 'employeeNumber', value: kyc.employeeNumber, onChange: v => kycUpdate('employeeNumber', v) })}
+              </div>
+              {IF({ label: 'Source of Income', name: 'sourceOfIncome', required: true, placeholder: 'e.g. Salary, Business', value: kyc.sourceOfIncome, onChange: v => kycUpdate('sourceOfIncome', v) })}
+
+              <div style={{ fontSize: 12, fontWeight: 700, color: C.navy, textTransform: 'uppercase', letterSpacing: '0.05em', marginTop: 16, marginBottom: 10 }}>Banking Details</div>
+              <div style={S.grid2}>
+                {IF({ label: 'Bank Name', name: 'bankName', required: true, value: kyc.bankName, onChange: v => kycUpdate('bankName', v) })}
+                {IF({ label: 'Branch Name', name: 'bankBranchName', value: kyc.bankBranchName, onChange: v => kycUpdate('bankBranchName', v) })}
               </div>
               <div style={S.grid2}>
-                <InputField label="Date of Birth" name="DOB" type="date" required value={kyc.DOB} onChange={v => kycUpdate('DOB', v)} />
-                <InputField label="Gender" name="gender" required options={lookups.genders} value={kyc.gender} onChange={v => kycUpdate('gender', v)} />
+                {IF({ label: 'Account Number', name: 'bankAccountNumber', required: true, value: kyc.bankAccountNumber, onChange: v => kycUpdate('bankAccountNumber', v) })}
+                {IF({ label: 'Account Name', name: 'bankAccountName', required: true, value: kyc.bankAccountName, onChange: v => kycUpdate('bankAccountName', v) })}
               </div>
+
+              <div style={{ fontSize: 12, fontWeight: 700, color: C.navy, textTransform: 'uppercase', letterSpacing: '0.05em', marginTop: 16, marginBottom: 10 }}>Sales & Next of Kin</div>
+              {IF({ label: 'Sales Person', name: 'salesPerson', options: lookups.salesPeople, value: kyc.salesPerson, onChange: v => kycUpdate('salesPerson', v) })}
               <div style={S.grid2}>
-                <InputField label="Nationality" name="nationality" required options={lookups.nationalities} value={kyc.nationality} onChange={v => kycUpdate('nationality', v)} />
-                <InputField label="ID Type" name="IDType" required options={['NRC', 'Passport', 'Driver\'s License']} value={kyc.IDType} onChange={v => kycUpdate('IDType', v)} />
+                {IF({ label: 'Next of Kin', name: 'nextOfKin', required: true, value: kyc.nextOfKin, onChange: v => kycUpdate('nextOfKin', v) })}
+                {IF({ label: 'Next of Kin Phone', name: 'nextOfKinPhone', required: true, value: kyc.nextOfKinPhone, onChange: v => kycUpdate('nextOfKinPhone', v) })}
               </div>
-              <InputField label="ID Number" name="IDNumber" required placeholder="e.g. 123456/10/1" value={kyc.IDNumber} onChange={v => kycUpdate('IDNumber', v)} />
-              <InputField label="Physical Address" name="physicalAddress" required value={kyc.physicalAddress} onChange={v => kycUpdate('physicalAddress', v)} />
-              <div style={S.grid2}>
-                <InputField label="Employer" name="employer" value={kyc.employer} onChange={v => kycUpdate('employer', v)} />
-                <InputField label="Employee Number" name="employeeNumber" value={kyc.employeeNumber} onChange={v => kycUpdate('employeeNumber', v)} />
-              </div>
-              {isUnitTrust && (
-                <InputField label="Source of Income" name="sourceOfIncome" required value={kyc.sourceOfIncome} onChange={v => kycUpdate('sourceOfIncome', v)} placeholder="e.g. Salary, Business" />
-              )}
-              <InputField label="Sales Person" name="salesPerson" options={lookups.salesPeople} value={kyc.salesPerson} onChange={v => kycUpdate('salesPerson', v)} />
-              <div style={{ marginTop: 8, marginBottom: 8, fontSize: 12, fontWeight: 700, color: C.gray700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Banking Details</div>
-              <div style={S.grid2}>
-                <InputField label="Bank Name" name="bankName" required value={kyc.bankName} onChange={v => kycUpdate('bankName', v)} />
-                <InputField label="Branch Name" name="bankBranchName" value={kyc.bankBranchName} onChange={v => kycUpdate('bankBranchName', v)} />
-              </div>
-              <div style={S.grid2}>
-                <InputField label="Account Number" name="bankAccountNumber" required value={kyc.bankAccountNumber} onChange={v => kycUpdate('bankAccountNumber', v)} />
-                <InputField label="Account Name" name="bankAccountName" required value={kyc.bankAccountName} onChange={v => kycUpdate('bankAccountName', v)} />
-              </div>
-              <div style={{ marginTop: 8, marginBottom: 8, fontSize: 12, fontWeight: 700, color: C.gray700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Next of Kin</div>
-              <div style={S.grid2}>
-                <InputField label="Next of Kin" name="nextOfKin" required value={kyc.nextOfKin} onChange={v => kycUpdate('nextOfKin', v)} />
-                <InputField label="Next of Kin Phone" name="nextOfKinPhone" required value={kyc.nextOfKinPhone} onChange={v => kycUpdate('nextOfKinPhone', v)} />
-              </div>
-              <InputField label="Relationship" name="relationshipWithNextOfKin" required value={kyc.relationshipWithNextOfKin} onChange={v => kycUpdate('relationshipWithNextOfKin', v)} placeholder="e.g. Spouse, Sibling" />
+              {IF({ label: 'Relationship', name: 'relationshipWithNextOfKin', required: true, placeholder: 'e.g. Spouse, Sibling', value: kyc.relationshipWithNextOfKin, onChange: v => kycUpdate('relationshipWithNextOfKin', v) })}
             </>
           )}
           {isCompany && (
             <>
-              <InputField label="Company Name" name="companyName" required value={kyc.companyName} onChange={v => kycUpdate('companyName', v)} />
-              <InputField label="Company ID / Registration Number" name="companyIDNumber" required value={kyc.companyIDNumber} onChange={v => kycUpdate('companyIDNumber', v)} />
+              <div style={{ fontSize: 12, fontWeight: 700, color: C.navy, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 10 }}>Company Details</div>
+              {IF({ label: 'Company Name', name: 'companyName', required: true, value: kyc.companyName, onChange: v => kycUpdate('companyName', v) })}
+              {IF({ label: 'Company ID / Registration Number', name: 'companyIDNumber', required: true, value: kyc.companyIDNumber, onChange: v => kycUpdate('companyIDNumber', v) })}
               <div style={S.grid2}>
-                <InputField label="Contact Person" name="contactPerson" required value={kyc.contactPerson} onChange={v => kycUpdate('contactPerson', v)} />
-                <InputField label="Contact Person Phone" name="contactPersonPhone" required value={kyc.contactPersonPhone} onChange={v => kycUpdate('contactPersonPhone', v)} />
+                {IF({ label: 'Contact Person', name: 'contactPerson', required: true, value: kyc.contactPerson, onChange: v => kycUpdate('contactPerson', v) })}
+                {IF({ label: 'Contact Person Phone', name: 'contactPersonPhone', required: true, value: kyc.contactPersonPhone, onChange: v => kycUpdate('contactPersonPhone', v) })}
               </div>
-              <InputField label="Contact Person Email" name="contactPersonEmail" type="email" value={kyc.contactPersonEmail} onChange={v => kycUpdate('contactPersonEmail', v)} />
+              {IF({ label: 'Contact Person Email', name: 'contactPersonEmail', type: 'email', value: kyc.contactPersonEmail, onChange: v => kycUpdate('contactPersonEmail', v) })}
+
+              <div style={{ fontSize: 12, fontWeight: 700, color: C.navy, textTransform: 'uppercase', letterSpacing: '0.05em', marginTop: 16, marginBottom: 10 }}>Contact & Identification</div>
               <div style={S.grid2}>
-                <InputField label="Company Email" name="emailAddress" type="email" required value={kyc.emailAddress} onChange={v => kycUpdate('emailAddress', v)} />
-                <InputField label="Company Phone" name="phoneNumber" required value={kyc.phoneNumber} onChange={v => kycUpdate('phoneNumber', v)} />
-              </div>
-              <div style={S.grid2}>
-                <InputField label="Nationality" name="nationality" required options={lookups.nationalities} value={kyc.nationality} onChange={v => kycUpdate('nationality', v)} />
-                <InputField label="ID Type" name="IDType" required options={['Certificate of Incorporation', 'Business Registration']} value={kyc.IDType} onChange={v => kycUpdate('IDType', v)} />
-              </div>
-              <InputField label="Physical Address" name="physicalAddress" required value={kyc.physicalAddress} onChange={v => kycUpdate('physicalAddress', v)} />
-              <InputField label="Sales Person" name="salesPerson" options={lookups.salesPeople} value={kyc.salesPerson} onChange={v => kycUpdate('salesPerson', v)} />
-              <div style={{ marginTop: 8, marginBottom: 8, fontSize: 12, fontWeight: 700, color: C.gray700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Banking Details</div>
-              <div style={S.grid2}>
-                <InputField label="Bank Name" name="bankName" required value={kyc.bankName} onChange={v => kycUpdate('bankName', v)} />
-                <InputField label="Branch Name" name="bankBranchName" value={kyc.bankBranchName} onChange={v => kycUpdate('bankBranchName', v)} />
+                {IF({ label: 'Company Email', name: 'emailAddress', type: 'email', required: true, value: kyc.emailAddress, onChange: v => kycUpdate('emailAddress', v) })}
+                {IF({ label: 'Company Phone', name: 'phoneNumber', required: true, value: kyc.phoneNumber, onChange: v => kycUpdate('phoneNumber', v) })}
               </div>
               <div style={S.grid2}>
-                <InputField label="Account Number" name="bankAccountNumber" required value={kyc.bankAccountNumber} onChange={v => kycUpdate('bankAccountNumber', v)} />
-                <InputField label="Account Name" name="bankAccountName" required value={kyc.bankAccountName} onChange={v => kycUpdate('bankAccountName', v)} />
+                {IF({ label: 'Nationality', name: 'nationality', required: true, options: lookups.nationalities, value: kyc.nationality, onChange: v => kycUpdate('nationality', v) })}
+                {IF({ label: 'ID Type', name: 'IDType', required: true, options: ['Certificate of Incorporation', 'Business Registration'], value: kyc.IDType, onChange: v => kycUpdate('IDType', v) })}
               </div>
-              <div style={{ marginTop: 8, marginBottom: 8, fontSize: 12, fontWeight: 700, color: C.gray700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Next of Kin / Authorized Representative</div>
+              {IF({ label: 'Physical Address', name: 'physicalAddress', required: true, value: kyc.physicalAddress, onChange: v => kycUpdate('physicalAddress', v) })}
+
+              <div style={{ fontSize: 12, fontWeight: 700, color: C.navy, textTransform: 'uppercase', letterSpacing: '0.05em', marginTop: 16, marginBottom: 10 }}>Banking Details</div>
+              {IF({ label: 'Sales Person', name: 'salesPerson', options: lookups.salesPeople, value: kyc.salesPerson, onChange: v => kycUpdate('salesPerson', v) })}
               <div style={S.grid2}>
-                <InputField label="Next of Kin" name="nextOfKin" required value={kyc.nextOfKin} onChange={v => kycUpdate('nextOfKin', v)} />
-                <InputField label="Next of Kin Phone" name="nextOfKinPhone" required value={kyc.nextOfKinPhone} onChange={v => kycUpdate('nextOfKinPhone', v)} />
+                {IF({ label: 'Bank Name', name: 'bankName', required: true, value: kyc.bankName, onChange: v => kycUpdate('bankName', v) })}
+                {IF({ label: 'Branch Name', name: 'bankBranchName', value: kyc.bankBranchName, onChange: v => kycUpdate('bankBranchName', v) })}
               </div>
-              <InputField label="Relationship" name="relationshipWithNextOfKin" required value={kyc.relationshipWithNextOfKin} onChange={v => kycUpdate('relationshipWithNextOfKin', v)} />
+              <div style={S.grid2}>
+                {IF({ label: 'Account Number', name: 'bankAccountNumber', required: true, value: kyc.bankAccountNumber, onChange: v => kycUpdate('bankAccountNumber', v) })}
+                {IF({ label: 'Account Name', name: 'bankAccountName', required: true, value: kyc.bankAccountName, onChange: v => kycUpdate('bankAccountName', v) })}
+              </div>
             </>
           )}
-          {/* Nav buttons */}
           <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
             <button onClick={() => setStep(1)} style={{ flex: 1, padding: '12px 0', borderRadius: 8, border: `1.5px solid ${C.gray200}`, background: 'transparent', color: C.gray600, fontWeight: 600, fontSize: 13, cursor: 'pointer', fontFamily: font.sans }}>Back</button>
             <button onClick={() => setStep(3)} style={{ flex: 2, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '12px 0', background: C.navy, color: C.white, fontWeight: 700, fontSize: 14, borderRadius: 8, border: 'none', cursor: 'pointer', fontFamily: font.sans }}>Next <ChevronRight size={14} /></button>
@@ -2621,62 +2886,73 @@ function PortalRegister({ isMobile }) {
         </div>
       )}
 
-      {/* ─── STEP 3: Product-Specific + Documents ─── */}
+      {/* ─── STEP 3: Unit Trust + Documents ─── */}
       {step === 3 && (
         <div>
-          {/* Unit Trust fields */}
           {isUnitTrust && (
             <div style={{ marginBottom: 20 }}>
               <div style={{ fontSize: 12, fontWeight: 700, color: C.navy, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 10 }}>Fund Selection</div>
-              <InputField label="Fund" name="fundName" required options={lookups.funds} value={unitTrust.fundName} onChange={v => setUnitTrust(p => ({ ...p, fundName: v }))} />
+              {IF({ label: 'Fund Name', name: 'fundName', required: true, options: lookups.funds, value: unitTrust.fundName, onChange: v => setUnitTrust(p => ({ ...p, fundName: v })) })}
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
                 <label style={{ fontSize: 13, color: C.gray700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <input type="checkbox" checked={unitTrust.beneficiary} onChange={e => setUnitTrust(p => ({ ...p, beneficiary: e.target.checked }))} style={{ accentColor: C.red }} />
+                  <input type="checkbox" checked={unitTrust.beneficiary} onChange={e => setUnitTrust(p => ({ ...p, beneficiary: e.target.checked, beneficiaryName: e.target.checked ? p.beneficiaryName : '', relationshipWithBeneficiary: e.target.checked ? p.relationshipWithBeneficiary : '', beneficiaryDOB: e.target.checked ? p.beneficiaryDOB : '' }))} style={{ accentColor: C.red }} />
                   Add a beneficiary to this account
                 </label>
               </div>
               {unitTrust.beneficiary && (
                 <div style={{ padding: '14px 16px', borderRadius: 10, background: C.gray50, border: `1px solid ${C.gray100}`, marginBottom: 12 }}>
-                  <InputField label="Beneficiary Name" name="beneficiaryName" required value={unitTrust.beneficiaryName} onChange={v => setUnitTrust(p => ({ ...p, beneficiaryName: v }))} />
+                  {IF({ label: 'Beneficiary Name', name: 'beneficiaryName', required: true, value: unitTrust.beneficiaryName, onChange: v => setUnitTrust(p => ({ ...p, beneficiaryName: v })) })}
                   <div style={S.grid2}>
-                    <InputField label="Relationship" name="relationshipWithBeneficiary" required value={unitTrust.relationshipWithBeneficiary} onChange={v => setUnitTrust(p => ({ ...p, relationshipWithBeneficiary: v }))} placeholder="e.g. Child, Spouse" />
-                    <InputField label="Date of Birth" name="beneficiaryDOB" type="date" required value={unitTrust.beneficiaryDOB} onChange={v => setUnitTrust(p => ({ ...p, beneficiaryDOB: v }))} />
+                    {IF({ label: 'Relationship', name: 'relationshipWithBeneficiary', required: true, value: unitTrust.relationshipWithBeneficiary, onChange: v => setUnitTrust(p => ({ ...p, relationshipWithBeneficiary: v })), placeholder: 'e.g. Child, Spouse' })}
+                    {IF({ label: 'Beneficiary DOB', name: 'beneficiaryDOB', type: 'date', required: true, value: unitTrust.beneficiaryDOB, onChange: v => setUnitTrust(p => ({ ...p, beneficiaryDOB: v })) })}
                   </div>
                 </div>
               )}
             </div>
           )}
-          {/* Credit fields */}
+
+          {/* Credit application fields */}
           {isCredit && (
             <div style={{ marginBottom: 20 }}>
               <div style={{ fontSize: 12, fontWeight: 700, color: C.navy, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 10 }}>Loan Details</div>
               <div style={S.grid2}>
-                <InputField label="Loan Amount (ZMW)" name="loanAmount" type="number" required placeholder="e.g. 50000" value={credit.loanAmount} onChange={v => setCredit(p => ({ ...p, loanAmount: v }))} />
-                <InputField label="Loan Type" name="loanType" required options={lookups.loanTypes} value={credit.loanType} onChange={v => setCredit(p => ({ ...p, loanType: v }))} />
+                {IF({ label: 'Loan Type', name: 'loanType', required: true, options: lookups.loanTypes, value: credit.loanType, onChange: v => setCredit(p => ({ ...p, loanType: v })) })}
+                {IF({ label: 'Loan Amount (ZMW)', name: 'loanAmount', type: 'number', required: true, placeholder: 'e.g. 50000', value: credit.loanAmount, onChange: v => setCredit(p => ({ ...p, loanAmount: v })) })}
               </div>
             </div>
           )}
-          {/* File uploads */}
-          <div style={{ fontSize: 12, fontWeight: 700, color: C.navy, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 10, marginTop: isStockBroking ? 0 : 8 }}>Upload Documents</div>
-          <FileField label="Copy of ID (NRC / Passport)" name="copyOfId" required />
-          {isIndividual && <FileField label="Passport Size Photo" name="passportSizePhoto" required />}
-          <div style={{ padding: '10px 14px', borderRadius: 8, background: `${C.navy}08`, border: `1px solid ${C.navy}15`, marginBottom: 12 }}>
-            <p style={{ fontSize: 11, color: C.gray600, lineHeight: 1.5 }}>
-              <b>Note:</b> Please upload at least one of the following — a <b>Reference Letter</b> or <b>Proof of Residence</b> (e.g. utility bill). If you provide one, the other is not required.
-            </p>
-          </div>
-          <div style={S.grid2}>
-            <FileField label="Reference Letter" name="referenceLetter" hint="optional if POR provided" />
-            <FileField label="Proof of Residence" name="proofOfResidence" hint="optional if RL provided" />
-          </div>
-          {/* Declaration */}
-          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginTop: 16, marginBottom: 8 }}>
+
+          <div style={{ fontSize: 12, fontWeight: 700, color: C.navy, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 10 }}>Upload Documents</div>
+          {FF({ label: isCompany ? 'Copy of NRC (Contact Person)' : 'Copy of ID (NRC / Passport)', name: 'copyOfId', required: true })}
+          {isIndividual && FF({ label: 'Passport Size Photo', name: 'passportSizePhoto', required: true })}
+          {isIndividual && (
+            <div style={{ padding: '10px 14px', borderRadius: 8, background: `${C.navy}08`, border: `1px solid ${C.navy}15`, marginBottom: 12 }}>
+              <p style={{ fontSize: 11, color: C.gray600, lineHeight: 1.5 }}>
+                <b>Note:</b> Please upload at least one of the following — a <b>Reference Letter</b> or <b>Proof of Residence</b> (e.g. utility bill). If you provide one, the other is not required.
+              </p>
+            </div>
+          )}
+          {isIndividual && (
+            <div style={S.grid2}>
+              {FF({ label: 'Reference Letter', name: 'referenceLetter', hint: 'optional if POR provided' })}
+              {FF({ label: 'Proof of Residence', name: 'proofOfResidence', hint: 'optional if RL provided' })}
+            </div>
+          )}
+          {isCompany && (
+            <>
+              {FF({ label: 'Certificate of Registration', name: 'referenceLetter', required: true })}
+              {FF({ label: 'Proof of Residence', name: 'proofOfResidence' })}
+            </>
+          )}
+
+          <div style={{ fontSize: 12, fontWeight: 700, color: C.navy, textTransform: 'uppercase', letterSpacing: '0.05em', marginTop: 16, marginBottom: 8 }}>Declaration</div>
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginBottom: 8 }}>
             <input type="checkbox" checked={kyc.declaration === 'true'} onChange={e => kycUpdate('declaration', e.target.checked ? 'true' : '')} style={{ marginTop: 3, accentColor: C.red }} />
             <label style={{ fontSize: 12, color: C.gray600, lineHeight: 1.5, cursor: 'pointer' }} onClick={() => kycUpdate('declaration', kyc.declaration === 'true' ? '' : 'true')}>
               I declare that all information provided is true and accurate to the best of my knowledge. I understand that providing false information may result in my application being rejected.
             </label>
           </div>
-          {/* Nav buttons */}
+
           <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
             <button onClick={() => setStep(2)} style={{ flex: 1, padding: '12px 0', borderRadius: 8, border: `1.5px solid ${C.gray200}`, background: 'transparent', color: C.gray600, fontWeight: 600, fontSize: 13, cursor: 'pointer', fontFamily: font.sans }}>Back</button>
             <button onClick={() => setStep(4)} style={{ flex: 2, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '12px 0', background: C.navy, color: C.white, fontWeight: 700, fontSize: 14, borderRadius: 8, border: 'none', cursor: 'pointer', fontFamily: font.sans }}>Review Application <ChevronRight size={14} /></button>
@@ -2688,20 +2964,19 @@ function PortalRegister({ isMobile }) {
       {step === 4 && (
         <div>
           <div style={{ fontSize: 12, color: C.gray500, marginBottom: 16, lineHeight: 1.5 }}>Please review your application details before submitting.</div>
-          {/* Summary sections */}
           {[
             { title: 'Application', rows: [['Product', product], ['Applicant Type', applicantType]] },
             { title: isIndividual ? 'Personal Details' : 'Company Details', rows: isIndividual
-              ? [['Name', [kyc.firstName, kyc.middleName, kyc.lastName].filter(Boolean).join(' ')], ['Email', kyc.emailAddress], ['Phone', kyc.phoneNumber], ['DOB', kyc.DOB], ['ID', `${kyc.IDType || ''} — ${kyc.IDNumber || ''}`], ['Address', kyc.physicalAddress]]
+              ? [['Name', [kyc.firstName, kyc.middleName, kyc.lastName].filter(Boolean).join(' ')], ['Email', kyc.emailAddress], ['Phone', kyc.phoneNumber], ['DOB', kyc.DOB], ['Gender', kyc.gender], ['Nationality', kyc.nationality], ['ID', `${kyc.IDType || ''} — ${kyc.IDNumber || ''}`], ['Address', kyc.physicalAddress]]
               : [['Company', kyc.companyName], ['Reg. No.', kyc.companyIDNumber], ['Contact', kyc.contactPerson], ['Email', kyc.emailAddress], ['Phone', kyc.phoneNumber], ['Address', kyc.physicalAddress]]
             },
             { title: 'Banking', rows: [['Bank', kyc.bankName], ['Account', `${kyc.bankAccountName || ''} — ${kyc.bankAccountNumber || ''}`]] },
             ...(isUnitTrust ? [{ title: 'Unit Trust', rows: [['Fund', unitTrust.fundName], ['Beneficiary', unitTrust.beneficiary ? `${unitTrust.beneficiaryName} (${unitTrust.relationshipWithBeneficiary})` : 'None']] }] : []),
-            ...(isCredit ? [{ title: 'Loan', rows: [['Amount', `K ${Number(credit.loanAmount || 0).toLocaleString()}`], ['Type', credit.loanType]] }] : []),
+            ...(isCredit ? [{ title: 'Credit Application', rows: [['Loan Type', credit.loanType], ['Loan Amount', credit.loanAmount ? `K ${Number(credit.loanAmount).toLocaleString()}` : '—']] }] : []),
             { title: 'Documents', rows: [
-              ['Copy of ID', files.copyOfId ? files.copyOfId.name : '—'],
+              [isCompany ? 'NRC (Contact Person)' : 'Copy of ID', files.copyOfId ? files.copyOfId.name : '—'],
               ...(isIndividual ? [['Passport Photo', files.passportSizePhoto ? files.passportSizePhoto.name : '—']] : []),
-              ['Reference Letter', files.referenceLetter ? files.referenceLetter.name : '—'],
+              [isCompany ? 'Certificate of Registration' : 'Reference Letter', files.referenceLetter ? files.referenceLetter.name : '—'],
               ['Proof of Residence', files.proofOfResidence ? files.proofOfResidence.name : '—'],
             ]},
           ].map(section => (
@@ -2717,8 +2992,6 @@ function PortalRegister({ isMobile }) {
               </div>
             </div>
           ))}
-
-          {/* Nav + Submit */}
           <div style={{ display: 'flex', gap: 10, marginTop: 20 }}>
             <button onClick={() => setStep(3)} style={{ flex: 1, padding: '12px 0', borderRadius: 8, border: `1.5px solid ${C.gray200}`, background: 'transparent', color: C.gray600, fontWeight: 600, fontSize: 13, cursor: 'pointer', fontFamily: font.sans }}>Back</button>
             <button disabled={submitting} onClick={handleSubmit} style={{
@@ -2757,7 +3030,7 @@ function ToolsPage({ onNavigate }) {
         <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.5)', marginTop: 6, position: 'relative' }}>Project your investment growth across our 7 Unit Trust funds</p>
       </div>
       <div style={{ flex: 1, padding: isMobile ? '20px 16px' : '32px 60px', background: C.offWhite }}>
-        <ReturnCalculator fund={funds[3]} onNavigate={onNavigate} />
+        <ReturnCalculator onNavigate={onNavigate} />
       </div>
     </div>
   );
