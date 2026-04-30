@@ -966,8 +966,8 @@ function ReturnCalculator({ initialFund, onNavigate }) {
                 <div style={{ fontSize: 12, fontWeight: 700, color: C.navy, textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 10 }}>Scenario Comparison</div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr 1fr 1fr', gap: 0 }}>
                   {/* Header */}
-                  {['', 'Conservative', 'Expected', 'Optimistic'].map(h => (
-                    <div key={h} style={{ padding: '6px 8px', fontSize: 10, fontWeight: 700, color: C.gray400, textTransform: 'uppercase', borderBottom: `2px solid ${C.gray100}` }}>{h}</div>
+                  {['', 'Conservative', 'Expected', 'Optimistic'].map((h, i) => (
+                    <div key={h} style={{ padding: '6px 8px', fontSize: 10, fontWeight: 700, color: C.gray400, textTransform: 'uppercase', borderBottom: `2px solid ${C.gray100}`, textAlign: i === 0 ? 'left' : 'right' }}>{h}</div>
                   ))}
                   {/* Rows */}
                   {[
