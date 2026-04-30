@@ -2559,7 +2559,7 @@ function PortalLogin() {
       </div>
       <h3 style={{ fontFamily: font.serif, fontSize: 20, fontWeight: 700, color: C.gray900, marginBottom: 8 }}>Sign In to Your Account</h3>
       <p style={{ fontSize: 14, color: C.gray500, lineHeight: 1.6, marginBottom: 20 }}>Access your Longhorn Trust portal to manage your investments, track performance, and view your portfolio.</p>
-      <a href="https://online.longhorn-associates.com/auth/login" target="_blank" rel="noopener noreferrer" style={{
+      <a href="https://longsmart.longhorn-associates.com/web/login" target="_blank" rel="noopener noreferrer" style={{
         display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
         width: '100%', padding: '14px 0', background: C.red, color: C.white,
         fontWeight: 700, fontSize: 14, borderRadius: 8, textDecoration: 'none',
