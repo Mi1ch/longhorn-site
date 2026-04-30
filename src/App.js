@@ -953,8 +953,6 @@ function ReturnCalculator({ initialFund, onNavigate }) {
                   ['Projection Type', result.projection_mode_label],
                   ['Investment Period', `${result.tenure_months} months`],
                   ['Simulations Run', Number(result.number_of_simulations).toLocaleString()],
-                  ['Starting Unit Price', `K ${Number(result.starting_unit_price).toFixed(4)}`],
-                  ['Est. Ending Unit Price', `K ${Number(result.estimated_ending_unit_price).toFixed(4)}`],
                 ].map(([label, value]) => (
                   <div key={label} style={{ display: 'flex', justifyContent: 'space-between', padding: '5px 0', borderBottom: `1px solid ${C.gray50}` }}>
                     <span style={{ fontSize: 12, color: C.gray500 }}>{label}</span>
@@ -1181,7 +1179,7 @@ const newsItems = [
    ══════════════════════════════════════════════ */
 const INSIGHTS_FONT = "'Inter',system-ui,-apple-system,sans-serif";
 
-function FundsTab({ isMobile }) {
+function FundsTab({ isMobile, onNavigate }) {
   const [fundsData, setFundsData] = useState(null); // { fundName: rows[] }
   const [error, setError] = useState(null);
   const [selectedFund, setSelectedFund] = useState(null); // fund name or null
@@ -1250,17 +1248,28 @@ function FundsTab({ isMobile }) {
 
     return (
       <div style={{ flex: 1, padding: isMobile ? '20px 16px' : '28px 60px', background: C.offWhite, fontFamily: INSIGHTS_FONT }}>
-        {/* Back button */}
-        <button onClick={() => setSelectedFund(null)} style={{
-          display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 14px', borderRadius: 8,
-          background: C.white, border: `1px solid ${C.gray200}`, color: C.gray700, fontSize: 13,
-          fontWeight: 600, cursor: 'pointer', fontFamily: INSIGHTS_FONT, marginBottom: 20,
-        }}
-          onMouseEnter={e => { e.currentTarget.style.background = C.gray50; e.currentTarget.style.borderColor = C.red; e.currentTarget.style.color = C.red; }}
-          onMouseLeave={e => { e.currentTarget.style.background = C.white; e.currentTarget.style.borderColor = C.gray200; e.currentTarget.style.color = C.gray700; }}
-        >
-          <ChevronLeft size={16} /> Back to All Funds
-        </button>
+        {/* Back button + ROI Calculator */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+          <button onClick={() => setSelectedFund(null)} style={{
+            display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 14px', borderRadius: 8,
+            background: C.white, border: `1px solid ${C.gray200}`, color: C.gray700, fontSize: 13,
+            fontWeight: 600, cursor: 'pointer', fontFamily: INSIGHTS_FONT,
+          }}
+            onMouseEnter={e => { e.currentTarget.style.background = C.gray50; e.currentTarget.style.borderColor = C.red; e.currentTarget.style.color = C.red; }}
+            onMouseLeave={e => { e.currentTarget.style.background = C.white; e.currentTarget.style.borderColor = C.gray200; e.currentTarget.style.color = C.gray700; }}
+          >
+            <ChevronLeft size={16} /> Back to All Funds
+          </button>
+          <button onClick={() => onNavigate && onNavigate('tools')} style={{
+            display: 'inline-flex', alignItems: 'center', gap: 8, padding: '10px 20px',
+            background: C.red, color: C.white, fontWeight: 700, fontSize: 12,
+            borderRadius: 8, border: 'none', cursor: 'pointer', fontFamily: font.sans,
+            transition: 'all 0.2s',
+          }}
+            onMouseEnter={e => e.currentTarget.style.background = C.redHover}
+            onMouseLeave={e => e.currentTarget.style.background = C.red}
+          ><Calculator size={14} /> ROI Calculator</button>
+        </div>
 
         {/* Performance Summary — top, full width, darker background */}
         <div style={{ padding: '20px 24px', borderRadius: 12, background: '#E8EDF4', border: `1px solid ${C.gray200}`, marginBottom: 20 }}>
@@ -1322,9 +1331,20 @@ function FundsTab({ isMobile }) {
         .funds-hscroll::-webkit-scrollbar-thumb:hover { background: ${C.gray300}; }
       `}</style>
 
-      <div style={{ marginBottom: 20 }}>
-        <h3 style={{ fontFamily: INSIGHTS_FONT, fontSize: isMobile ? 20 : 24, fontWeight: 700, color: C.gray900, marginBottom: 4, letterSpacing: '-0.02em' }}>Longhorn Fund Performance</h3>
-        <p style={{ fontFamily: INSIGHTS_FONT, fontSize: 13, color: C.gray500 }}>Funds glide automatically — use the arrows or drag to explore. Click any card for its full performance history.</p>
+      <div style={{ marginBottom: 20, display: 'flex', justifyContent: 'space-between', alignItems: isMobile ? 'flex-start' : 'center', flexDirection: isMobile ? 'column' : 'row', gap: 12 }}>
+        <div>
+          <h3 style={{ fontFamily: INSIGHTS_FONT, fontSize: isMobile ? 20 : 24, fontWeight: 700, color: C.gray900, marginBottom: 4, letterSpacing: '-0.02em' }}>Longhorn Fund Performance</h3>
+          <p style={{ fontFamily: INSIGHTS_FONT, fontSize: 13, color: C.gray500 }}>Use the arrows or drag to explore. Click any card for its full performance history.</p>
+        </div>
+        <button onClick={() => onNavigate && onNavigate('tools')} style={{
+          display: 'inline-flex', alignItems: 'center', gap: 8, padding: '10px 20px',
+          background: C.red, color: C.white, fontWeight: 700, fontSize: 12,
+          borderRadius: 8, border: 'none', cursor: 'pointer', fontFamily: font.sans,
+          whiteSpace: 'nowrap', transition: 'all 0.2s', flexShrink: 0,
+        }}
+          onMouseEnter={e => e.currentTarget.style.background = C.redHover}
+          onMouseLeave={e => e.currentTarget.style.background = C.red}
+        ><Calculator size={14} /> ROI Calculator</button>
       </div>
 
       <div style={{ position: 'relative' }}>
@@ -1903,7 +1923,7 @@ function InsightsPage({ onNavigate }) {
       )}
 
       {/* ═══ FUNDS TAB ═══ */}
-      {tab === 'funds' && <FundsTab isMobile={isMobile} />}
+      {tab === 'funds' && <FundsTab isMobile={isMobile} onNavigate={onNavigate} />}
 
       {/* ═══ NEWS & EVENTS TAB ═══ */}
       {tab === 'news' && (
@@ -2507,9 +2527,9 @@ function PortalPage() {
     <div style={{ display: 'flex', flexDirection: 'column', minHeight: 'calc(100vh - 64px)', background: C.offWhite }}>
       <div style={{ background: HEADER_GRADIENT, padding: isMobile ? '24px 20px' : '32px 60px', textAlign: 'center' }}>
         <div style={{ fontFamily: font.serif, fontSize: 26, fontWeight: 800, color: C.white, marginBottom: 4 }}>
-          <span style={{ color: '#FFD0D5' }}>SIMP</span> Invest
+          <span style={{ color: '#FFD0D5' }}>Longhorn</span> Trust
         </div>
-        <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)' }}>Secure Investor Management Portal</p>
+        <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)' }}>Investor Onboarding Portal</p>
       </div>
       <div style={{ display: 'flex', justifyContent: 'center', padding: '20px 20px 0' }}>
         <div style={{ display: 'flex', background: C.gray50, borderRadius: 10, padding: 3, width: isMobile ? '100%' : 360 }}>
@@ -2538,7 +2558,7 @@ function PortalLogin() {
         <LogIn size={28} style={{ color: C.navy }} />
       </div>
       <h3 style={{ fontFamily: font.serif, fontSize: 20, fontWeight: 700, color: C.gray900, marginBottom: 8 }}>Sign In to Your Account</h3>
-      <p style={{ fontSize: 14, color: C.gray500, lineHeight: 1.6, marginBottom: 20 }}>Access your SIMP Invest portal to manage your investments, track performance, and view your portfolio.</p>
+      <p style={{ fontSize: 14, color: C.gray500, lineHeight: 1.6, marginBottom: 20 }}>Access your Longhorn Trust portal to manage your investments, track performance, and view your portfolio.</p>
       <a href="https://online.longhorn-associates.com/auth/login" target="_blank" rel="noopener noreferrer" style={{
         display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
         width: '100%', padding: '14px 0', background: C.red, color: C.white,
@@ -2547,7 +2567,7 @@ function PortalLogin() {
       }}
         onMouseEnter={e => e.currentTarget.style.background = C.redHover}
         onMouseLeave={e => e.currentTarget.style.background = C.red}
-      ><LogIn size={16} /> Sign In to SIMP Invest</a>
+      ><LogIn size={16} /> Sign In to Longhorn Trust</a>
       <p style={{ fontSize: 12, color: C.gray400, marginTop: 10 }}>You will be redirected to the secure login portal</p>
     </div>
   );
@@ -3307,7 +3327,7 @@ const jobListings = [
   { title: 'Investment Analyst', dept: 'Investments', location: 'Lusaka', type: 'Full-time', desc: 'Join our investment team to research and analyse market opportunities across equity, fixed income, and alternative asset classes. CFA or ACCA qualification preferred.' },
   { title: 'Client Relationship Manager', dept: 'Client Services', location: 'Lusaka', type: 'Full-time', desc: 'Build and maintain strong client relationships, manage portfolios, and provide personalised investment guidance to our growing client base.' },
   { title: 'Branch Manager', dept: 'Operations', location: 'Kitwe', type: 'Full-time', desc: 'Lead our Copperbelt branch operations, drive business development, and ensure excellent service delivery across all product lines.' },
-  { title: 'IT Systems Administrator', dept: 'Technology', location: 'Lusaka', type: 'Full-time', desc: 'Manage and maintain our technology infrastructure including SIMP Invest platform, data analytics tools, and cybersecurity systems.' },
+  { title: 'IT Systems Administrator', dept: 'Technology', location: 'Lusaka', type: 'Full-time', desc: 'Manage and maintain our technology infrastructure including Longhorn Trust platform, data analytics tools, and cybersecurity systems.' },
 ];
 
 function CareersPage({ onNavigate }) {
