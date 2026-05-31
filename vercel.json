@@ -1,6 +1,405 @@
 {
   "rewrites": [
     {
+      "source": "/api/foreign-exchange/",
+      "destination": "https://longhorn-api.onrender.com/api/foreign-exchange/"
+    },
+    {
+      "source": "/api/foreign-exchange",
+      "destination": "https://longhorn-api.onrender.com/api/foreign-exchange/"
+    },
+    {
+      "source": "/api/fund-performance/",
+      "destination": "https://longhorn-api.onrender.com/api/fund-performance/"
+    },
+    {
+      "source": "/api/fund-performance",
+      "destination": "https://longhorn-api.onrender.com/api/fund-performance/"
+    },
+    {
+      "source": "/api/fund-performance-benchmark/",
+      "destination": "https://longhorn-api.onrender.com/api/fund-performance-benchmark/"
+    },
+    {
+      "source": "/api/fund-performance-benchmark",
+      "destination": "https://longhorn-api.onrender.com/api/fund-performance-benchmark/"
+    },
+    {
+      "source": "/api/all-share-index-benchmark/",
+      "destination": "https://longhorn-api.onrender.com/api/all-share-index-benchmark/"
+    },
+    {
+      "source": "/api/all-share-index-benchmark",
+      "destination": "https://longhorn-api.onrender.com/api/all-share-index-benchmark/"
+    },
+    {
+      "source": "/api/monetary-policyrate-benchmark/",
+      "destination": "https://longhorn-api.onrender.com/api/monetary-policyrate-benchmark/"
+    },
+    {
+      "source": "/api/monetary-policyrate-benchmark",
+      "destination": "https://longhorn-api.onrender.com/api/monetary-policyrate-benchmark/"
+    },
+    {
+      "source": "/api/inflation-rate-benchmark/",
+      "destination": "https://longhorn-api.onrender.com/api/inflation-rate-benchmark/"
+    },
+    {
+      "source": "/api/inflation-rate-benchmark",
+      "destination": "https://longhorn-api.onrender.com/api/inflation-rate-benchmark/"
+    },
+    {
+      "source": "/api/grz-securities-benchmark/",
+      "destination": "https://longhorn-api.onrender.com/api/grz-securities-benchmark/"
+    },
+    {
+      "source": "/api/grz-securities-benchmark",
+      "destination": "https://longhorn-api.onrender.com/api/grz-securities-benchmark/"
+    },
+    {
+      "source": "/api/projector-parameters/",
+      "destination": "https://longhorn-api.onrender.com/api/projector-parameters/"
+    },
+    {
+      "source": "/api/projector-parameters",
+      "destination": "https://longhorn-api.onrender.com/api/projector-parameters/"
+    },
+    {
+      "source": "/api/funds/",
+      "destination": "https://longhorn-api.onrender.com/api/funds/"
+    },
+    {
+      "source": "/api/funds",
+      "destination": "https://longhorn-api.onrender.com/api/funds/"
+    },
+    {
+      "source": "/api/unit-trust-projection/",
+      "destination": "https://longhorn-api.onrender.com/api/unit-trust-projection/"
+    },
+    {
+      "source": "/api/unit-trust-projection",
+      "destination": "https://longhorn-api.onrender.com/api/unit-trust-projection/"
+    },
+
+    {
+      "source": "/api/unit-trust-prices/",
+      "destination": "https://longhorn-api.onrender.com/api/unit-trust-prices/"
+    },
+    {
+      "source": "/api/unit-trust-prices",
+      "destination": "https://longhorn-api.onrender.com/api/unit-trust-prices/"
+    },
+    {
+      "source": "/api/unit-trust-prices/bulk-post/",
+      "destination": "https://longhorn-api.onrender.com/api/unit-trust-prices/bulk-post/"
+    },
+    {
+      "source": "/api/unit-trust-prices/bulk-post",
+      "destination": "https://longhorn-api.onrender.com/api/unit-trust-prices/bulk-post/"
+    },
+
+    {
+      "source": "/api/boz-securities/",
+      "destination": "https://longhorn-api.onrender.com/api/boz-securities/"
+    },
+    {
+      "source": "/api/boz-securities",
+      "destination": "https://longhorn-api.onrender.com/api/boz-securities/"
+    },
+    {
+      "source": "/api/boz-securities/bulk-post/",
+      "destination": "https://longhorn-api.onrender.com/api/boz-securities/bulk-post/"
+    },
+    {
+      "source": "/api/boz-securities/bulk-post",
+      "destination": "https://longhorn-api.onrender.com/api/boz-securities/bulk-post/"
+    },
+
+    {
+      "source": "/api/monthly-inflation/",
+      "destination": "https://longhorn-api.onrender.com/api/monthly-inflation/"
+    },
+    {
+      "source": "/api/monthly-inflation",
+      "destination": "https://longhorn-api.onrender.com/api/monthly-inflation/"
+    },
+    {
+      "source": "/api/monthly-inflation/bulk-post/",
+      "destination": "https://longhorn-api.onrender.com/api/monthly-inflation/bulk-post/"
+    },
+    {
+      "source": "/api/monthly-inflation/bulk-post",
+      "destination": "https://longhorn-api.onrender.com/api/monthly-inflation/bulk-post/"
+    },
+
+    {
+      "source": "/api/monetary-policy-rate/",
+      "destination": "https://longhorn-api.onrender.com/api/monetary-policy-rate/"
+    },
+    {
+      "source": "/api/monetary-policy-rate",
+      "destination": "https://longhorn-api.onrender.com/api/monetary-policy-rate/"
+    },
+    {
+      "source": "/api/monetary-policy-rate/bulk-post/",
+      "destination": "https://longhorn-api.onrender.com/api/monetary-policy-rate/bulk-post/"
+    },
+    {
+      "source": "/api/monetary-policy-rate/bulk-post",
+      "destination": "https://longhorn-api.onrender.com/api/monetary-policy-rate/bulk-post/"
+    },
+
+    {
+      "source": "/api/exchange-rate/",
+      "destination": "https://longhorn-api.onrender.com/api/exchange-rate/"
+    },
+    {
+      "source": "/api/exchange-rate",
+      "destination": "https://longhorn-api.onrender.com/api/exchange-rate/"
+    },
+    {
+      "source": "/api/exchange-rate/bulk-post/",
+      "destination": "https://longhorn-api.onrender.com/api/exchange-rate/bulk-post/"
+    },
+    {
+      "source": "/api/exchange-rate/bulk-post",
+      "destination": "https://longhorn-api.onrender.com/api/exchange-rate/bulk-post/"
+    },
+
+    {
+      "source": "/api/stock-price/",
+      "destination": "https://longhorn-api.onrender.com/api/stock-price/"
+    },
+    {
+      "source": "/api/stock-price",
+      "destination": "https://longhorn-api.onrender.com/api/stock-price/"
+    },
+    {
+      "source": "/api/stock-price/bulk-post/",
+      "destination": "https://longhorn-api.onrender.com/api/stock-price/bulk-post/"
+    },
+    {
+      "source": "/api/stock-price/bulk-post",
+      "destination": "https://longhorn-api.onrender.com/api/stock-price/bulk-post/"
+    },
+
+    {
+      "source": "/api/allshare-index/",
+      "destination": "https://longhorn-api.onrender.com/api/allshare-index/"
+    },
+    {
+      "source": "/api/allshare-index",
+      "destination": "https://longhorn-api.onrender.com/api/allshare-index/"
+    },
+    {
+      "source": "/api/allshare-index/bulk-post/",
+      "destination": "https://longhorn-api.onrender.com/api/allshare-index/bulk-post/"
+    },
+    {
+      "source": "/api/allshare-index/bulk-post",
+      "destination": "https://longhorn-api.onrender.com/api/allshare-index/bulk-post/"
+    },
+
+    {
+      "source": "/api/onboarding/lookups/products/",
+      "destination": "https://longhorn-api.onrender.com/api/onboarding/lookups/products/"
+    },
+    {
+      "source": "/api/onboarding/lookups/products",
+      "destination": "https://longhorn-api.onrender.com/api/onboarding/lookups/products/"
+    },
+    {
+      "source": "/api/onboarding/lookups/applicant-types/",
+      "destination": "https://longhorn-api.onrender.com/api/onboarding/lookups/applicant-types/"
+    },
+    {
+      "source": "/api/onboarding/lookups/applicant-types",
+      "destination": "https://longhorn-api.onrender.com/api/onboarding/lookups/applicant-types/"
+    },
+    {
+      "source": "/api/onboarding/lookups/nationalities/",
+      "destination": "https://longhorn-api.onrender.com/api/onboarding/lookups/nationalities/"
+    },
+    {
+      "source": "/api/onboarding/lookups/nationalities",
+      "destination": "https://longhorn-api.onrender.com/api/onboarding/lookups/nationalities/"
+    },
+    {
+      "source": "/api/onboarding/lookups/genders/",
+      "destination": "https://longhorn-api.onrender.com/api/onboarding/lookups/genders/"
+    },
+    {
+      "source": "/api/onboarding/lookups/genders",
+      "destination": "https://longhorn-api.onrender.com/api/onboarding/lookups/genders/"
+    },
+    {
+      "source": "/api/onboarding/lookups/sales-people/",
+      "destination": "https://longhorn-api.onrender.com/api/onboarding/lookups/sales-people/"
+    },
+    {
+      "source": "/api/onboarding/lookups/sales-people",
+      "destination": "https://longhorn-api.onrender.com/api/onboarding/lookups/sales-people/"
+    },
+    {
+      "source": "/api/onboarding/lookups/funds/",
+      "destination": "https://longhorn-api.onrender.com/api/onboarding/lookups/funds/"
+    },
+    {
+      "source": "/api/onboarding/lookups/funds",
+      "destination": "https://longhorn-api.onrender.com/api/onboarding/lookups/funds/"
+    },
+    {
+      "source": "/api/onboarding/lookups/loan-types/",
+      "destination": "https://longhorn-api.onrender.com/api/onboarding/lookups/loan-types/"
+    },
+    {
+      "source": "/api/onboarding/lookups/loan-types",
+      "destination": "https://longhorn-api.onrender.com/api/onboarding/lookups/loan-types/"
+    },
+    {
+      "source": "/api/onboarding/register/unit-trust/",
+      "destination": "https://longhorn-api.onrender.com/api/onboarding/register/unit-trust/"
+    },
+    {
+      "source": "/api/onboarding/register/unit-trust",
+      "destination": "https://longhorn-api.onrender.com/api/onboarding/register/unit-trust/"
+    },
+    {
+      "source": "/api/onboarding/register/credit-application/",
+      "destination": "https://longhorn-api.onrender.com/api/onboarding/register/credit-application/"
+    },
+    {
+      "source": "/api/onboarding/register/credit-application",
+      "destination": "https://longhorn-api.onrender.com/api/onboarding/register/credit-application/"
+    },
+    {
+      "source": "/api/onboarding/register/stock-broking/",
+      "destination": "https://longhorn-api.onrender.com/api/onboarding/register/stock-broking/"
+    },
+    {
+      "source": "/api/onboarding/register/stock-broking",
+      "destination": "https://longhorn-api.onrender.com/api/onboarding/register/stock-broking/"
+    },
+
+    {
+      "source": "/api/leadership/categories/",
+      "destination": "https://longhorn-api.onrender.com/api/leadership/categories/"
+    },
+    {
+      "source": "/api/leadership/categories",
+      "destination": "https://longhorn-api.onrender.com/api/leadership/categories/"
+    },
+    {
+      "source": "/api/leadership/members/",
+      "destination": "https://longhorn-api.onrender.com/api/leadership/members/"
+    },
+    {
+      "source": "/api/leadership/members",
+      "destination": "https://longhorn-api.onrender.com/api/leadership/members/"
+    },
+
+    {
+      "source": "/api/insights/categories/",
+      "destination": "https://longhorn-api.onrender.com/api/insights/categories/"
+    },
+    {
+      "source": "/api/insights/categories",
+      "destination": "https://longhorn-api.onrender.com/api/insights/categories/"
+    },
+    {
+      "source": "/api/insights/posts/",
+      "destination": "https://longhorn-api.onrender.com/api/insights/posts/"
+    },
+    {
+      "source": "/api/insights/posts",
+      "destination": "https://longhorn-api.onrender.com/api/insights/posts/"
+    },
+    {
+      "source": "/api/insights/posts/:slug/",
+      "destination": "https://longhorn-api.onrender.com/api/insights/posts/:slug/"
+    },
+    {
+      "source": "/api/insights/posts/:slug",
+      "destination": "https://longhorn-api.onrender.com/api/insights/posts/:slug/"
+    },
+
+    {
+      "source": "/api/product-media/formats/",
+      "destination": "https://longhorn-api.onrender.com/api/product-media/formats/"
+    },
+    {
+      "source": "/api/product-media/formats",
+      "destination": "https://longhorn-api.onrender.com/api/product-media/formats/"
+    },
+    {
+      "source": "/api/product-media/videos/",
+      "destination": "https://longhorn-api.onrender.com/api/product-media/videos/"
+    },
+    {
+      "source": "/api/product-media/videos",
+      "destination": "https://longhorn-api.onrender.com/api/product-media/videos/"
+    },
+    {
+      "source": "/api/product-media/videos/:slug/",
+      "destination": "https://longhorn-api.onrender.com/api/product-media/videos/:slug/"
+    },
+    {
+      "source": "/api/product-media/videos/:slug",
+      "destination": "https://longhorn-api.onrender.com/api/product-media/videos/:slug/"
+    },
+
+    {
+      "source": "/api/fund-facts/",
+      "destination": "https://longhorn-api.onrender.com/api/fund-facts/"
+    },
+    {
+      "source": "/api/fund-facts",
+      "destination": "https://longhorn-api.onrender.com/api/fund-facts/"
+    },
+    {
+      "source": "/api/fund-facts/:slug/",
+      "destination": "https://longhorn-api.onrender.com/api/fund-facts/:slug/"
+    },
+    {
+      "source": "/api/fund-facts/:slug",
+      "destination": "https://longhorn-api.onrender.com/api/fund-facts/:slug/"
+    },
+
+    {
+      "source": "/api/faqs/",
+      "destination": "https://longhorn-api.onrender.com/api/faqs/"
+    },
+    {
+      "source": "/api/faqs",
+      "destination": "https://longhorn-api.onrender.com/api/faqs/"
+    },
+    {
+      "source": "/api/faqs/all/",
+      "destination": "https://longhorn-api.onrender.com/api/faqs/all/"
+    },
+    {
+      "source": "/api/faqs/all",
+      "destination": "https://longhorn-api.onrender.com/api/faqs/all/"
+    },
+
+    {
+      "source": "/api/contact/services/",
+      "destination": "https://longhorn-api.onrender.com/api/contact/services/"
+    },
+    {
+      "source": "/api/contact/services",
+      "destination": "https://longhorn-api.onrender.com/api/contact/services/"
+    },
+    {
+      "source": "/api/contact/messages/",
+      "destination": "https://longhorn-api.onrender.com/api/contact/messages/"
+    },
+    {
+      "source": "/api/contact/messages",
+      "destination": "https://longhorn-api.onrender.com/api/contact/messages/"
+    },
+
+    {
       "source": "/api/:path*",
       "destination": "https://longhorn-api.onrender.com/api/:path*"
     }
