@@ -1163,15 +1163,7 @@ const marketSnapshot = [
   { label: '91-Day T-Bill', value: '11.2%', change: '-0.1%', negative: false },
 ];
 
-/* ── News items ── */
-const newsItems = [
-  { title: 'Longhorn Associates Annual General Meeting 2024', date: 'Nov 2024', cat: 'Events', excerpt: 'Annual general meeting highlights and key resolutions from the 2024 session.' },
-  { title: 'Client Engagement Seminar', date: 'Oct 2024', cat: 'Events', excerpt: 'Opportunities shared as we outlined wealth creation strategies for our investors.' },
-  { title: 'End of Year Team Building', date: 'Dec 2024', cat: 'Company', excerpt: 'Remembering milestones and celebrating our team\'s achievements.' },
-  { title: 'Understanding the 7 Unit Trust Funds', date: 'Jan 2025', cat: 'Education', excerpt: 'From Listed Equities to the White Coat Fund — fees, risks & suitability.' },
-  { title: 'Education Fund: Rising School Fees', date: 'Sep 2024', cat: 'Education', excerpt: 'Our Education Fund (3.5% p.a.) helps parents build for the future.' },
-  { title: 'White Coat Fund Spotlight', date: 'Aug 2024', cat: 'Funds', excerpt: 'Lowest fee at 2.5% — designed for medical professionals.' },
-];
+/* News items are now fetched from API in InsightsPage */
 
 /* ══════════════════════════════════════════════
    FUNDS TAB — horizontal side-scroll carousel
@@ -1268,7 +1260,7 @@ function FundsTab({ isMobile, onNavigate }) {
           }}
             onMouseEnter={e => e.currentTarget.style.background = C.redHover}
             onMouseLeave={e => e.currentTarget.style.background = C.red}
-          ><Calculator size={14} /> ROI Calculator</button>
+          ><Calculator size={14} /> Estimate Your Earnings</button>
         </div>
 
         {/* Performance Summary — top, full width, darker background */}
@@ -1344,7 +1336,7 @@ function FundsTab({ isMobile, onNavigate }) {
         }}
           onMouseEnter={e => e.currentTarget.style.background = C.redHover}
           onMouseLeave={e => e.currentTarget.style.background = C.red}
-        ><Calculator size={14} /> ROI Calculator</button>
+        ><Calculator size={14} /> Estimate Your Earnings</button>
       </div>
 
       <div style={{ position: 'relative' }}>
@@ -1714,29 +1706,29 @@ function MarketSnapshotCards({ isMobile }) {
         });
       }
 
-      /* Monetary Policy Rate */
+      /* Monetary Policy Rate — macro indicator (no directional arrow) */
       if (mprRes.status === 'fulfilled') {
         const d = mprRes.value;
-        const dir = (d.direction || '').toLowerCase();
         result.push({
           label: 'Monetary Policy Rate',
           value: d.monetaryPolicyRate != null ? `${Number(d.monetaryPolicyRate).toFixed(1)}%` : '—',
           change: d.change || '—',
-          negative: dir === 'up',
+          negative: false,
           date: d.date,
+          isMacro: true,
         });
       }
 
-      /* Inflation Rate */
+      /* Inflation Rate — macro indicator (no directional arrow) */
       if (infRes.status === 'fulfilled') {
         const d = infRes.value;
-        const dir = (d.direction || '').toLowerCase();
         result.push({
           label: 'Inflation Rate',
           value: d.inflation != null ? `${Number(d.inflation).toFixed(1)}%` : '—',
           change: d.change || '—',
-          negative: dir === 'up',
+          negative: false,
           date: d.date,
+          isMacro: true,
         });
       }
 
@@ -1788,9 +1780,10 @@ function MarketSnapshotCards({ isMobile }) {
   const CARD_W = isMobile ? 175 : 220;
 
   const renderCard = (c) => {
+    const isMacro = c.isMacro;
     const isUp = !c.negative;
-    const accentColor = isUp ? C.green : '#DC2626';
-    const bgTint = isUp ? 'rgba(22,163,74,0.04)' : 'rgba(220,38,38,0.04)';
+    const accentColor = isMacro ? C.navy : (isUp ? C.green : '#DC2626');
+    const bgTint = isMacro ? 'rgba(26,75,140,0.04)' : (isUp ? 'rgba(22,163,74,0.04)' : 'rgba(220,38,38,0.04)');
     return (
       <div key={c.label} style={{
         flex: `0 0 ${CARD_W}px`, width: CARD_W, padding: '18px 16px', borderRadius: 14,
@@ -1803,17 +1796,21 @@ function MarketSnapshotCards({ isMobile }) {
         {/* Label row with direction indicator */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10, position: 'relative' }}>
           <div style={{ fontFamily: INSIGHTS_FONT, fontSize: 10, color: C.gray400, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>{c.label}</div>
-          {/* Direction arrow circle */}
+          {/* Direction indicator */}
           <div style={{
             width: 24, height: 24, borderRadius: '50%',
             background: `${accentColor}12`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
           }}>
-            <div style={{
-              width: 0, height: 0,
-              borderLeft: '4px solid transparent', borderRight: '4px solid transparent',
-              borderBottom: isUp ? `6px solid ${accentColor}` : 'none',
-              borderTop: !isUp ? `6px solid ${accentColor}` : 'none',
-            }} />
+            {isMacro ? (
+              <div style={{ width: 10, height: 10, borderRadius: '50%', background: accentColor, opacity: 0.6 }} />
+            ) : (
+              <div style={{
+                width: 0, height: 0,
+                borderLeft: '4px solid transparent', borderRight: '4px solid transparent',
+                borderBottom: isUp ? `6px solid ${accentColor}` : 'none',
+                borderTop: !isUp ? `6px solid ${accentColor}` : 'none',
+              }} />
+            )}
           </div>
         </div>
 
@@ -1827,7 +1824,7 @@ function MarketSnapshotCards({ isMobile }) {
           background: `${accentColor}10`,
           fontFamily: INSIGHTS_FONT, fontSize: 11, fontWeight: 700, color: accentColor,
         }}>
-          <span style={{ fontSize: 9 }}>{isUp ? '▲' : '▼'}</span>
+          {!isMacro && <span style={{ fontSize: 9 }}>{isUp ? '▲' : '▼'}</span>}
           {c.change}
         </div>
 
@@ -1882,9 +1879,108 @@ function MarketSnapshotCards({ isMobile }) {
   );
 }
 
+
+/* ═══════════════════════════════════════════ */
+/*  NEWS TAB — API-driven posts & categories   */
+/* ═══════════════════════════════════════════ */
+function NewsTab({ isMobile }) {
+  const [posts, setPosts] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedPost, setSelectedPost] = useState(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    cachedFetch('/api/insights/posts/')
+      .then(data => {
+        if (cancelled) return;
+        setPosts(Array.isArray(data) ? data : []);
+        setLoading(false);
+      })
+      .catch(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, []);
+
+  if (loading) return <div style={{ flex: 1, padding: 40, textAlign: 'center', color: C.gray400 }}>Loading news…</div>;
+
+  const fmtDate = (d) => d ? new Date(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '';
+
+  return (
+    <div style={{ flex: 1, padding: isMobile ? '20px 16px' : '28px 60px', background: C.offWhite }}>
+      <h3 style={{ fontFamily: font.serif, fontSize: 20, fontWeight: 700, color: C.gray900, marginBottom: 20 }}>Latest News & Events</h3>
+      {posts.length === 0 ? (
+        <div style={{ padding: 40, textAlign: 'center', color: C.gray500 }}>No posts available.</div>
+      ) : (
+        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, 1fr)', gap: 20 }}>
+          {posts.map(post => (
+            <div key={post.id} onClick={() => setSelectedPost(post)} style={{
+              background: C.white, borderRadius: 12, overflow: 'hidden',
+              border: `1px solid ${C.gray100}`, transition: 'all 0.25s', cursor: 'pointer',
+            }}
+              onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-3px)'; e.currentTarget.style.boxShadow = '0 8px 24px rgba(0,0,0,0.08)'; }}
+              onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = 'none'; }}
+            >
+              <div style={{ height: 160, overflow: 'hidden', background: `linear-gradient(135deg, ${C.navy}, ${C.navyLight})` }}>
+                {post.cover_image_url ? (
+                  <img src={post.cover_image_url} alt={post.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                    onError={e => { e.target.style.display = 'none'; }} />
+                ) : (
+                  <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <Newspaper size={32} style={{ color: 'rgba(255,255,255,0.3)' }} />
+                  </div>
+                )}
+              </div>
+              <div style={{ padding: 18 }}>
+                <span style={{ fontSize: 10, fontWeight: 700, color: C.red, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{post.category_name}</span>
+                <h3 style={{ fontFamily: font.serif, fontSize: 15, fontWeight: 700, color: C.gray900, marginTop: 6, marginBottom: 8, lineHeight: 1.3 }}>{post.title}</h3>
+                <p style={{ fontSize: 12, color: C.gray500, lineHeight: 1.5, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{post.summary}</p>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 10 }}>
+                  <span style={{ fontSize: 11, color: C.gray400 }}>{fmtDate(post.published_date)}</span>
+                  <span style={{ fontSize: 11, color: C.red, fontWeight: 600 }}>Read More →</span>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Post detail modal */}
+      {selectedPost && (
+        <div onClick={() => setSelectedPost(null)} style={{
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)',
+          zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24,
+        }}>
+          <div onClick={e => e.stopPropagation()} style={{
+            background: '#fff', borderRadius: 20, maxWidth: 640, width: '100%',
+            maxHeight: '85vh', overflow: 'auto', boxShadow: '0 24px 64px rgba(0,0,0,0.2)', position: 'relative',
+          }}>
+            <button onClick={() => setSelectedPost(null)} style={{
+              position: 'absolute', top: 16, right: 16, width: 36, height: 36, borderRadius: '50%',
+              background: 'rgba(255,255,255,0.9)', border: 'none', cursor: 'pointer',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10,
+            }}><X size={18} style={{ color: '#374151' }} /></button>
+            {selectedPost.cover_image_url ? (
+              <img src={selectedPost.cover_image_url} alt={selectedPost.title} style={{ width: '100%', height: 220, objectFit: 'cover' }} />
+            ) : (
+              <div style={{ height: 140, background: `linear-gradient(135deg, ${C.navy}, ${C.navyLight})`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <Newspaper size={40} style={{ color: 'rgba(255,255,255,0.3)' }} />
+              </div>
+            )}
+            <div style={{ padding: '28px 32px' }}>
+              <span style={{ fontSize: 11, fontWeight: 700, color: C.red, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{selectedPost.category_name}</span>
+              <h2 style={{ fontFamily: font.serif, fontSize: 22, fontWeight: 700, color: C.gray900, marginTop: 8, marginBottom: 12, lineHeight: 1.3 }}>{selectedPost.title}</h2>
+              <div style={{ fontSize: 12, color: C.gray400, marginBottom: 16 }}>{fmtDate(selectedPost.published_date)}</div>
+              <div style={{ width: 32, height: 3, borderRadius: 2, background: C.red, marginBottom: 16 }} />
+              <p style={{ fontSize: 15, color: C.gray600, lineHeight: 1.8, whiteSpace: 'pre-line' }}>{selectedPost.content || selectedPost.summary}</p>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function InsightsPage({ onNavigate }) {
   const [tab, setTab] = useState('funds');
-  const [selectedNews, setSelectedNews] = useState(null);
   const isMobile = useIsMobile();
   const tabs = ['Funds', 'Markets', 'News & Events'];
   const tabKeys = ['funds', 'markets', 'news'];
@@ -1925,65 +2021,15 @@ function InsightsPage({ onNavigate }) {
       {/* ═══ FUNDS TAB ═══ */}
       {tab === 'funds' && <FundsTab isMobile={isMobile} onNavigate={onNavigate} />}
 
-      {/* ═══ NEWS & EVENTS TAB ═══ */}
-      {tab === 'news' && (
-        <div style={{ flex: 1, padding: isMobile ? '20px 16px' : '28px 60px', background: C.offWhite }}>
-          <h3 style={{ fontFamily: font.serif, fontSize: 20, fontWeight: 700, color: C.gray900, marginBottom: 20 }}>Latest News & Events</h3>
-          <NewsCarousel items={newsItems} onSelect={setSelectedNews} />
-          {/* News detail modal */}
-          {selectedNews && (
-            <div onClick={() => setSelectedNews(null)} style={{
-              position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)',
-              zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24,
-            }}>
-              <div onClick={e => e.stopPropagation()} style={{
-                background: '#fff', borderRadius: 20, maxWidth: 560, width: '100%',
-                overflow: 'hidden', boxShadow: '0 24px 64px rgba(0,0,0,0.2)', position: 'relative',
-              }}>
-                <button onClick={() => setSelectedNews(null)} style={{
-                  position: 'absolute', top: 16, right: 16, width: 36, height: 36, borderRadius: '50%',
-                  background: 'rgba(255,255,255,0.9)', border: 'none', cursor: 'pointer',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10,
-                }}><X size={18} style={{ color: '#374151' }} /></button>
-                <div style={{ height: 140, background: `linear-gradient(135deg, ${C.navy}, ${C.navyLight})`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <Newspaper size={40} style={{ color: 'rgba(255,255,255,0.3)' }} />
-                </div>
-                <div style={{ padding: '28px 32px' }}>
-                  <span style={{ fontSize: 11, fontWeight: 700, color: C.red, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{selectedNews.cat}</span>
-                  <h2 style={{ fontFamily: font.serif, fontSize: 22, fontWeight: 700, color: C.gray900, marginTop: 8, marginBottom: 12, lineHeight: 1.3 }}>{selectedNews.title}</h2>
-                  <div style={{ fontSize: 12, color: C.gray400, marginBottom: 16 }}>{selectedNews.date}</div>
-                  <div style={{ width: 32, height: 3, borderRadius: 2, background: C.red, marginBottom: 16 }} />
-                  <p style={{ fontSize: 15, color: C.gray600, lineHeight: 1.8 }}>{selectedNews.excerpt}</p>
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-      )}
+      {/* ═══ NEWS & EVENTS TAB — API-driven ═══ */}
+      {tab === 'news' && <NewsTab isMobile={isMobile} />}
     </div>
   );
 }
 
 /* ═══════════════════════════════════════════ */
-/*  TEAM DATA                                  */
+/*  TEAM DATA — loaded from API                */
 /* ═══════════════════════════════════════════ */
-const boardOfDirectors = [
-  { name: 'Chanda HJ Chileshe', role: 'Chairman', photo: '/images/team/ChandaChileshe.jpg', initials: 'CC', bio: 'Chanda is a seasoned lawyer and Managing Partner of Lloyd Jones & Collins with over 35 years experience in commercial and legal practice both locally and internationally. He holds a Bachelor of Arts – Joint Hons. in Law & Economics from the University of Keele as well as a Master of Laws Degree, LLM: Taxation, Insurance, Company Law from the University of London. He is a member of various professional bodies and has sat on various Boards including Finance Bank (Atlas Mara), Colgate Palmolive and the Revenue Appeals Tribunal, among others.' },
-  { name: 'Banji Gideon Moono', role: 'Director, CFA', photo: '/images/team/BanjiMoono.jpeg', initials: 'BM', bio: 'Banji is a qualified and experienced Finance, Accounting, and Investment professional with extensive experience in Banking and Investments. He has served in senior management positions with various commercial banks including Finance Bank and most recently, the United Bank for Africa where he is currently serving as the Group Head-Investor Relations based in Nigeria. Banji is a qualified Chartered Management Accountant (CIMA) and holder of the prestigious CFA Charter. He holds a Diploma in Treasury Management and is also a fellow of the Zambia Institute of Chartered Accountants (ZICA).' },
-  { name: 'Dionysius Makunka', role: 'CEO, CFA', photo: '/images/team/DionysiusMakunka.jpg', initials: 'DM', bio: 'Dionysius is a qualified and experienced Economics and Finance professional with over twenty (20) years of practice with various institutions. He spent about twenty years at the Bank of Zambia where he served in senior management positions prior to going into private practice. He has also been involved in lecturing at the University of Zambia (Derivatives), ZIBFS (Investment Analysis & Portfolio Management) and the University of Lusaka (Risk Management). Dionysius is a Chartered Accountant (ACCA) and holds the prestigious CFA Charter. He also holds the Bachelor of Accountancy degree from the Copperbelt University as well as a Master of Science in Finance & Economics from Manchester University, UK.' },
-  { name: 'Namucana Musiwa', role: 'Director', photo: '/images/team/NamucanaMusiwa.jpg', initials: 'NM', bio: 'Namucana is an entrepreneur with extensive experience in governance and talent acquisition. She is the founder and CEO of Career Prospects Limited, one of the leading recruitment agencies in Zambia. She has served and continues to serve on various Boards including the Zambia Qualification Authority, Zambia Institute of Human Resources Management, Professional Insurance Corporation and the University of Zambia Council, Bank of Zambia REMCO, Zambia National Building Society REMCO, among others. Namucana holds a Bachelor of Arts in Public Administration and Economics obtained from the University of Zambia.' },
-  { name: 'Andrew John Kangwa', role: 'Investment Committee Member', photo: '/images/team/Andrew.jpeg', initials: 'AK', bio: 'Andrew is an experienced finance professional and entrepreneur. Having spent several years working in the Finance division of mining group, First Quantum Mining Plc, he set up private enterprises focused on diversified sectors. Among other qualifications, he holds a Master of Business Administration (MBA).' },
-  { name: 'Pathias Paupila', role: 'Director', photo: '/images/team/Pathius.jpeg', initials: 'PP', bio: 'Pathias is a qualified and experienced Legal, Credit, Risk and Compliance professional with extensive exposure to managing complex risk processes gained in several institutions for over 18 years. He possesses extensive experience in the allocation of capital to Small and Medium Enterprises (SMEs). Pathias also Chairs the Risk and Compliance Committee of Longhorn Associates Limited. He holds a Master of Science degree in Risk Management, a Bachelor of Laws degree and a Bachelor of Business Administration degree.' },
-];
-
-const managementTeam = [
-  { name: 'Dionysius Makunka', role: 'CEO, CFA', photo: '/images/team/DionysiusMakunka.jpg', initials: 'DM', bio: 'Dionysius is a qualified and experienced Economics and Finance professional with over twenty (20) years of practice with various institutions. He spent about twenty years at the Bank of Zambia where he served in senior management positions prior to going into private practice. Dionysius is a Chartered Accountant (ACCA) and holds the prestigious CFA Charter.' },
-  { name: 'Brian Chilufya Chintu', role: 'Chief Investments & Operations Officer', photo: '/images/team/BrianChilufyaChintu.JPG', initials: 'BC', bio: 'Brian is a qualified and experienced Finance and Investments professional with experience in management of assorted investment portfolios including Pension Funds and Collective Investments. He has specialized in Investments during his time with the Madison Group where he served in various portfolios in Finance and Investments. More recently he served as Commercial Services Director at Zambia Airports Corporation. He comes with a wealth of experience with particular focus in Corporate Finance, Investments and Accounting.' },
-  { name: 'Marlon Nsofu', role: 'Chief Systems & Data Analytics Officer', photo: '/images/team/MarlonNsofu.jpg', initials: 'MN', bio: 'Marlon is an investment professional with over fourteen years of experience in managing pension funds and collective investment schemes. His expertise spans across money markets, capital markets, and other key economic sectors. He has earned certifications in computer science and data science, which he leverages to enhance his work in quantitative finance and financial engineering. He holds a bachelor\'s degree in finance from the Robert H. Smith School of Business at the University of Maryland, USA.' },
-  { name: 'Izukanji Nachiza Mwanza', role: 'CFO', photo: '/images/team/IzukanjiMwanza.jpg', initials: 'IM', bio: 'Izukanji started her accounting career with AMO Chartered Accountants in 2011 where she worked as a Management Trainee. She later worked at various institutions in the Finance and Accounting role. Prior to her accounting career, she pursued a diploma in Chemical Engineering at the Copperbelt University. Izukanji is a Chartered Accountant and holder of the ACCA qualification. She is also a member of both ACCA and ZICA.' },
-  { name: 'Lewis Mwale', role: 'Chief Partnerships Officer', photo: '/images/team/lewis.jpg', initials: 'LM', bio: 'Lewis is a qualified Social Security Expert and Financial Advisor with over 7 years work experience in the Pensions Industry in Zambia. He holds a Bachelor\'s Degree in Business Administration from the Copperbelt University and is currently pursuing a Master of Business Administration (MBA) - Finance. Prior to joining Longhorn, Lewis worked as a Financial Controller for Innscor Zambia Limited and as a Credit and Debt Analyst for Vision Fund Zambia.' },
-  { name: 'Patrick Edward Zulu', role: 'Chief Credit Operations & Fintech Officer', photo: '/images/team/Patrick.jpeg', initials: 'PZ', bio: 'Patrick is a seasoned Certified Credit Professional and management specialist with a proven record of building and leading diverse teams. He holds an MBA in Accounting and Finance from the University of Liverpool and a BA with a bias in Economics from the University of Zambia. With more than 18 years of experience, Patrick has worked across credit risk, strategic planning, human resource management and change management at leading institutions including Bayport Financial Services and Micro Finance Zambia Limited.' },
-];
 
 /* ── Team Member Card ── */
 function TeamCard({ member, accentColor, onSelect }) {
@@ -2239,12 +2285,100 @@ function NewsCarousel({ items, onSelect }) {
 /* ═══════════════════════════════════════════ */
 /*  ABOUT PAGE                                */
 /* ═══════════════════════════════════════════ */
+
+/* ═══════════════════════════════════════════ */
+/*  TEAM TAB — API-driven leadership data      */
+/* ═══════════════════════════════════════════ */
+function TeamTabContent({ teamTab, setTeamTab, selectedMember, setSelectedMember }) {
+  const [categories, setCategories] = useState([]);
+  const [members, setMembers] = useState({});
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    /* Fetch categories first, then all members */
+    cachedFetch('/api/leadership/categories/')
+      .then(cats => {
+        if (cancelled) return;
+        const sorted = (Array.isArray(cats) ? cats : []).sort((a, b) => a.display_order - b.display_order);
+        setCategories(sorted);
+        /* Fetch members 0-12 in parallel */
+        const ids = Array.from({ length: 13 }, (_, i) => i);
+        return Promise.allSettled(ids.map(id => cachedFetch(`/api/leadership/members/${id}/`)));
+      })
+      .then(results => {
+        if (cancelled || !results) return;
+        const byCategory = {};
+        results.forEach(r => {
+          if (r.status === 'fulfilled' && r.value && r.value.id != null) {
+            const m = r.value;
+            const catKey = m.id <= 5 ? 'board-of-directors' : 'management';
+            if (!byCategory[catKey]) byCategory[catKey] = [];
+            byCategory[catKey].push({
+              name: m.full_name,
+              role: m.designation,
+              photo: m.photo_url,
+              initials: m.full_name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase(),
+              bio: (m.full_bio || '').replace(/\r\n/g, ' '),
+            });
+          }
+        });
+        /* Sort by display_order if available */
+        Object.keys(byCategory).forEach(k => {
+          byCategory[k].sort((a, b) => (a.display_order || 0) - (b.display_order || 0));
+        });
+        setMembers(byCategory);
+        setLoading(false);
+      })
+      .catch(() => setLoading(false));
+    return () => { cancelled = true; };
+  }, []);
+
+  if (loading) {
+    return <div style={{ padding: 40, textAlign: 'center', color: C.gray400, fontSize: 14 }}>Loading team…</div>;
+  }
+
+  const catSlugs = categories.map(c => c.slug);
+  const activeSlug = teamTab === 'board' ? 'board-of-directors' : 'management';
+  const activeMembers = members[activeSlug] || [];
+
+  return (
+    <div>
+      {/* Category toggle from API */}
+      <div style={{ display: 'flex', justifyContent: 'center', gap: 8, marginBottom: 24 }}>
+        {categories.map(cat => {
+          const key = cat.slug === 'board-of-directors' ? 'board' : 'mgmt';
+          return (
+            <button key={cat.id} onClick={() => setTeamTab(key)} style={{
+              padding: '10px 28px', borderRadius: 100, fontSize: 14, fontWeight: 600, cursor: 'pointer',
+              background: teamTab === key ? C.gray900 : C.white,
+              color: teamTab === key ? '#fff' : C.gray500,
+              border: teamTab === key ? `2px solid ${C.gray900}` : `2px solid ${C.gray200}`,
+              transition: 'all 0.2s', fontFamily: font.sans,
+            }}>{cat.name}</button>
+          );
+        })}
+      </div>
+
+      {activeMembers.length > 0 ? (
+        <TeamCarousel members={activeMembers} accentColor={teamTab === 'board' ? C.red : C.navyLight} onSelect={setSelectedMember} />
+      ) : (
+        <div style={{ padding: 40, textAlign: 'center', color: C.gray400 }}>No team members found.</div>
+      )}
+
+      {selectedMember && (
+        <TeamModal member={selectedMember} accentColor={teamTab === 'board' ? C.red : C.navyLight} onClose={() => setSelectedMember(null)} />
+      )}
+    </div>
+  );
+}
+
 function AboutPage({ initialTab }) {
   const [tab, setTab] = useState(initialTab || 'about');
   const [teamTab, setTeamTab] = useState('board');
   const [selectedMember, setSelectedMember] = useState(null);
   const isMobile = useIsMobile();
-  const tabs = [{ k: 'about', l: 'About Us' }, { k: 'team', l: 'Our Team' }, { k: 'governance', l: 'Governance' }, { k: 'values', l: 'Core Values' }];
+  const tabs = [{ k: 'about', l: 'About Us' }, { k: 'team', l: 'Our Team' }, { k: 'values', l: 'Core Values' }];
 
   useEffect(() => { if (initialTab) setTab(initialTab); }, [initialTab]);
 
@@ -2253,8 +2387,8 @@ function AboutPage({ initialTab }) {
       <div style={{ background: HEADER_GRADIENT, padding: isMobile ? '24px 20px' : '32px 60px' }}>
         <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', justifyContent: 'space-between', alignItems: isMobile ? 'flex-start' : 'flex-end', gap: isMobile ? 16 : 0 }}>
           <div>
-            <h1 style={{ fontFamily: font.serif, fontSize: isMobile ? 22 : 30, fontWeight: 700, color: C.white }}>About Longhorn Associates</h1>
-            <p style={{ fontSize: isMobile ? 12 : 14, color: 'rgba(255,255,255,0.5)', marginTop: 6 }}>SEC & PIA Licensed Investment Management Company</p>
+            <h1 style={{ fontFamily: font.serif, fontSize: isMobile ? 22 : 30, fontWeight: 700, color: C.white }}>Longhorn Associates</h1>
+            <p style={{ fontSize: isMobile ? 12 : 14, color: 'rgba(255,255,255,0.5)', marginTop: 6 }}>A licensed and regulated investment and financial services institution</p>
           </div>
           <div style={{ display: 'flex', gap: 4 }}>
             {tabs.map(t => (
@@ -2299,37 +2433,9 @@ function AboutPage({ initialTab }) {
           </div>
         )}
 
-        {/* Our Team — NEW: Board of Directors + Management */}
+        {/* Our Team — API-driven */}
         {tab === 'team' && (
-          <div>
-            {/* Board / Management toggle */}
-            <div style={{ display: 'flex', justifyContent: 'center', gap: 8, marginBottom: 24 }}>
-              {[{ key: 'board', label: 'Board of Directors' }, { key: 'mgmt', label: 'Management' }].map(t => (
-                <button key={t.key} onClick={() => setTeamTab(t.key)} style={{
-                  padding: '10px 28px', borderRadius: 100, fontSize: 14, fontWeight: 600, cursor: 'pointer',
-                  background: teamTab === t.key ? C.gray900 : C.white,
-                  color: teamTab === t.key ? '#fff' : C.gray500,
-                  border: teamTab === t.key ? `2px solid ${C.gray900}` : `2px solid ${C.gray200}`,
-                  transition: 'all 0.2s', fontFamily: font.sans,
-                }}>{t.label}</button>
-              ))}
-            </div>
-
-            {/* Board of Directors */}
-            {teamTab === 'board' && (
-              <TeamCarousel members={boardOfDirectors} accentColor={C.red} onSelect={setSelectedMember} />
-            )}
-
-            {/* Management */}
-            {teamTab === 'mgmt' && (
-              <TeamCarousel members={managementTeam} accentColor={C.navyLight} onSelect={setSelectedMember} />
-            )}
-
-            {/* Bio Modal */}
-            {selectedMember && (
-              <TeamModal member={selectedMember} accentColor={teamTab === 'board' ? C.red : C.navyLight} onClose={() => setSelectedMember(null)} />
-            )}
-          </div>
+          <TeamTabContent teamTab={teamTab} setTeamTab={setTeamTab} selectedMember={selectedMember} setSelectedMember={setSelectedMember} />
         )}
 
         {/* Core Values — unchanged */}
@@ -2345,28 +2451,6 @@ function AboutPage({ initialTab }) {
           </div>
         )}
 
-        {/* Governance — unchanged */}
-        {tab === 'governance' && (
-          <div style={{ maxWidth: 700 }}>
-            <div style={{ width: 40, height: 3, background: C.red, borderRadius: 2, marginBottom: 16 }} />
-            <h2 style={{ fontFamily: font.serif, fontSize: 24, fontWeight: 700, color: C.gray900, marginBottom: 16 }}>Governance Structure</h2>
-            <p style={{ fontSize: 15, color: C.gray600, lineHeight: 1.8, marginBottom: 24 }}>The Longhorn Unit Trust operates through a robust tripartite governance structure, ensuring the highest standards of accountability and investor protection:</p>
-            {[
-              { title: 'Fund Manager — Longhorn Associates', desc: 'Licensed by SEC to make investment decisions and manage the Unit Trust portfolios.' },
-              { title: 'Custodian — Approved Bank', desc: 'An independent bank holds all fund assets, ensuring separation from the management company.' },
-              { title: 'Trustee — Independent Firm', desc: 'An approved independent firm acts as registered Trustee, overseeing fund operations on behalf of investors.' },
-              { title: 'Regulator — SEC Zambia', desc: 'The Securities and Exchange Commission authorizes, regulates, and monitors all Unit Trust operations.' },
-            ].map(({ title, desc }, i) => (
-              <div key={title} style={{ display: 'flex', gap: 16, marginBottom: 16, padding: '18px 22px', borderRadius: 12, background: C.white, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
-                <div style={{ width: 40, height: 40, borderRadius: 10, background: C.navy, color: C.white, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: font.serif, fontWeight: 700, fontSize: 16, flexShrink: 0 }}>{i + 1}</div>
-                <div>
-                  <div style={{ fontSize: 15, fontWeight: 700, color: C.gray900, marginBottom: 4 }}>{title}</div>
-                  <p style={{ fontSize: 13, color: C.gray500, lineHeight: 1.6 }}>{desc}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
       </div>
     </div>
   );
@@ -2520,7 +2604,6 @@ function PortalFileField({ label, name, required, hint, file, onFileChange, fiel
 }
 
 function PortalPage() {
-  const [tab, setTab] = useState('login');
   const isMobile = useIsMobile();
 
   return (
@@ -2531,47 +2614,15 @@ function PortalPage() {
         </div>
         <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)' }}>Investor Onboarding Portal</p>
       </div>
-      <div style={{ display: 'flex', justifyContent: 'center', padding: '20px 20px 0' }}>
-        <div style={{ display: 'flex', background: C.gray50, borderRadius: 10, padding: 3, width: isMobile ? '100%' : 360 }}>
-          {['login', 'register'].map(t => (
-            <button key={t} onClick={() => setTab(t)} style={{
-              flex: 1, padding: '10px 0', borderRadius: 8, border: 'none', cursor: 'pointer',
-              fontFamily: font.sans, fontWeight: 600, fontSize: 14,
-              background: tab === t ? C.navy : 'transparent',
-              color: tab === t ? C.white : C.gray400, transition: 'all 0.2s',
-            }}>{t === 'login' ? 'Sign In' : 'Register'}</button>
-          ))}
-        </div>
-      </div>
-      <div style={{ flex: 1, padding: isMobile ? '20px 16px' : '24px 60px', maxWidth: tab === 'login' ? 480 : 720, margin: '0 auto', width: '100%' }}>
-        {tab === 'login' ? <PortalLogin /> : <PortalRegister isMobile={isMobile} />}
+      <div style={{ flex: 1, padding: isMobile ? '20px 16px' : '24px 60px', maxWidth: 720, margin: '0 auto', width: '100%' }}>
+        <PortalRegister isMobile={isMobile} />
       </div>
       <p style={{ textAlign: 'center', fontSize: 10, color: C.gray400, padding: '12px 0' }}>256-bit SSL · Regulated by SEC & PIA Zambia</p>
     </div>
   );
 }
 
-function PortalLogin() {
-  return (
-    <div style={{ background: C.white, borderRadius: 16, padding: 32, boxShadow: '0 4px 20px rgba(0,0,0,0.06)', textAlign: 'center', marginTop: 8 }}>
-      <div style={{ width: 64, height: 64, borderRadius: '50%', background: `${C.navy}12`, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' }}>
-        <LogIn size={28} style={{ color: C.navy }} />
-      </div>
-      <h3 style={{ fontFamily: font.serif, fontSize: 20, fontWeight: 700, color: C.gray900, marginBottom: 8 }}>Sign In to Your Account</h3>
-      <p style={{ fontSize: 14, color: C.gray500, lineHeight: 1.6, marginBottom: 20 }}>Access your Longhorn Trust portal to manage your investments, track performance, and view your portfolio.</p>
-      <a href="https://longsmart.longhorn-associates.com/web/login" target="_blank" rel="noopener noreferrer" style={{
-        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-        width: '100%', padding: '14px 0', background: C.red, color: C.white,
-        fontWeight: 700, fontSize: 14, borderRadius: 8, textDecoration: 'none',
-        fontFamily: font.sans, transition: 'all 0.2s',
-      }}
-        onMouseEnter={e => e.currentTarget.style.background = C.redHover}
-        onMouseLeave={e => e.currentTarget.style.background = C.red}
-      ><LogIn size={16} /> Sign In to Longhorn Trust</a>
-      <p style={{ fontSize: 12, color: C.gray400, marginTop: 10 }}>You will be redirected to the secure login portal</p>
-    </div>
-  );
-}
+
 
 function PortalRegister({ isMobile }) {
   const S = portalStyles;
@@ -3046,7 +3097,7 @@ function ToolsPage({ onNavigate }) {
           backgroundImage: `repeating-linear-gradient(90deg, transparent, transparent 60px, rgba(255,255,255,0.03) 60px, rgba(255,255,255,0.03) 61px)`,
           pointerEvents: 'none'
         }} />
-        <h1 style={{ fontFamily: font.serif, fontSize: 30, fontWeight: 700, color: C.white, position: 'relative' }}>ROI Calculator</h1>
+        <h1 style={{ fontFamily: font.serif, fontSize: 30, fontWeight: 700, color: C.white, position: 'relative' }}>Estimate Your Earnings</h1>
         <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.5)', marginTop: 6, position: 'relative' }}>Project your investment growth across our 7 Unit Trust funds</p>
       </div>
       <div style={{ flex: 1, padding: isMobile ? '20px 16px' : '32px 60px', background: C.offWhite }}>
@@ -3320,98 +3371,200 @@ function ServicesPage({ onNavigate, serviceId }) {
   );
 }
 
-/* ═══════════════════════════════════════════ */
-/*  CAREERS PAGE                               */
-/* ═══════════════════════════════════════════ */
-const jobListings = [
-  { title: 'Investment Analyst', dept: 'Investments', location: 'Lusaka', type: 'Full-time', desc: 'Join our investment team to research and analyse market opportunities across equity, fixed income, and alternative asset classes. CFA or ACCA qualification preferred.' },
-  { title: 'Client Relationship Manager', dept: 'Client Services', location: 'Lusaka', type: 'Full-time', desc: 'Build and maintain strong client relationships, manage portfolios, and provide personalised investment guidance to our growing client base.' },
-  { title: 'Branch Manager', dept: 'Operations', location: 'Kitwe', type: 'Full-time', desc: 'Lead our Copperbelt branch operations, drive business development, and ensure excellent service delivery across all product lines.' },
-  { title: 'IT Systems Administrator', dept: 'Technology', location: 'Lusaka', type: 'Full-time', desc: 'Manage and maintain our technology infrastructure including Longhorn Trust platform, data analytics tools, and cybersecurity systems.' },
-];
 
-function CareersPage({ onNavigate }) {
-  const [selectedJob, setSelectedJob] = useState(null);
+/* ═══════════════════════════════════════════ */
+/*  INVESTING WITH US PAGE                     */
+/*  Video, Fund Facts, FAQs                    */
+/* ═══════════════════════════════════════════ */
+function InvestingPage({ onNavigate }) {
   const isMobile = useIsMobile();
+  const [videos, setVideos] = useState([]);
+  const [fundFacts, setFundFacts] = useState([]);
+  const [faqs, setFaqs] = useState([]);
+  const [selectedFund, setSelectedFund] = useState(null);
+  const [fundDetail, setFundDetail] = useState(null);
+  const [openFaq, setOpenFaq] = useState(null);
+  const [openCat, setOpenCat] = useState(null);
+
+  useEffect(() => {
+    cachedFetch('/api/product-media/videos/').then(d => setVideos(Array.isArray(d) ? d : [])).catch(() => {});
+    cachedFetch('/api/fund-facts/').then(d => setFundFacts(Array.isArray(d) ? d : [])).catch(() => {});
+    cachedFetch('/api/faqs/').then(d => setFaqs(Array.isArray(d) ? d : [])).catch(() => {});
+  }, []);
+
+  /* Load fund detail when selected */
+  useEffect(() => {
+    if (selectedFund == null) { setFundDetail(null); return; }
+    setFundDetail(null);
+    cachedFetch(`/api/fund-facts/${selectedFund}/`).then(d => setFundDetail(d)).catch(() => {});
+  }, [selectedFund]);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', minHeight: 'calc(100vh - 64px)' }}>
       <MarketTicker />
-      <div style={{ background: HEADER_GRADIENT, padding: isMobile ? '24px 20px' : '40px 60px' }}>
-        <h1 style={{ fontFamily: font.serif, fontSize: isMobile ? 22 : 30, fontWeight: 700, color: C.white }}>Careers at Longhorn</h1>
-        <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.5)', marginTop: 6 }}>Join our team and help build Zambia's financial future</p>
+      <div style={{ background: HEADER_GRADIENT, padding: isMobile ? '24px 20px' : '32px 60px' }}>
+        <h1 style={{ fontFamily: font.serif, fontSize: isMobile ? 22 : 30, fontWeight: 700, color: C.white }}>Investing With Us</h1>
+        <p style={{ fontSize: isMobile ? 12 : 14, color: 'rgba(255,255,255,0.5)', marginTop: 6 }}>Everything you need to start your investment journey</p>
       </div>
 
       <div style={{ flex: 1, padding: isMobile ? '20px 16px' : '32px 60px', background: C.offWhite }}>
-        {/* Intro */}
-        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1.4fr 1fr', gap: 32, marginBottom: 36 }}>
-          <div>
-            <div style={{ width: 40, height: 3, background: C.red, borderRadius: 2, marginBottom: 16 }} />
-            <h2 style={{ fontFamily: font.serif, fontSize: 24, fontWeight: 700, color: C.gray900, marginBottom: 12 }}>Why Work With Us?</h2>
-            <p style={{ fontSize: 15, color: C.gray600, lineHeight: 1.8, marginBottom: 16 }}>At Longhorn Associates, we believe in investing in our people as much as we invest for our clients. We offer a collaborative, growth-oriented environment where your expertise makes a real impact on Zambia's financial landscape.</p>
-            {['Competitive compensation & benefits', 'Professional development & CFA support', 'Collaborative, innovative culture', 'Direct impact on Zambia\'s financial growth'].map(f => (
-              <div key={f} style={{ display: 'flex', gap: 10, alignItems: 'center', marginBottom: 8 }}>
-                <CheckCircle size={14} style={{ color: C.green }} />
-                <span style={{ fontSize: 14, color: C.gray600, fontWeight: 500 }}>{f}</span>
-              </div>
-            ))}
-          </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-            {[{ val: '50+', sub: 'Team Members' }, { val: '4', sub: 'Office Locations' }, { val: '15+', sub: 'Years Growing' }, { val: '100%', sub: 'Zambian Owned' }].map(({ val, sub }) => (
-              <div key={sub} style={{ padding: 20, borderRadius: 14, background: C.white, boxShadow: '0 2px 8px rgba(0,0,0,0.06)', textAlign: 'center' }}>
-                <div style={{ fontFamily: font.serif, fontSize: 24, fontWeight: 800, color: C.navy }}>{val}</div>
-                <div style={{ fontSize: 12, color: C.gray400, marginTop: 4, fontWeight: 600 }}>{sub}</div>
-              </div>
-            ))}
-          </div>
-        </div>
 
-        {/* Job Listings */}
-        <h2 style={{ fontFamily: font.serif, fontSize: 22, fontWeight: 700, color: C.gray900, marginBottom: 20 }}>Open Positions</h2>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          {jobListings.map((job, i) => (
-            <div key={i} onClick={() => setSelectedJob(selectedJob === i ? null : i)} style={{
-              background: C.white, borderRadius: 12, border: `1px solid ${selectedJob === i ? C.red : C.gray100}`,
-              overflow: 'hidden', cursor: 'pointer', transition: 'all 0.2s',
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '18px 24px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-                  <div style={{ width: 44, height: 44, borderRadius: 12, background: `${C.red}12`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <Briefcase size={20} style={{ color: C.red }} />
-                  </div>
-                  <div>
-                    <div style={{ fontSize: 16, fontWeight: 700, color: C.gray900 }}>{job.title}</div>
-                    <div style={{ fontSize: 12, color: C.gray500, marginTop: 2 }}>{job.dept} · {job.location} · {job.type}</div>
-                  </div>
-                </div>
-                <ChevronDown size={18} style={{ color: C.gray400, transform: selectedJob === i ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
-              </div>
-              {selectedJob === i && (
-                <div style={{ padding: '0 24px 20px', borderTop: `1px solid ${C.gray100}`, marginTop: -4, paddingTop: 16 }}>
-                  <p style={{ fontSize: 14, color: C.gray600, lineHeight: 1.7, marginBottom: 16 }}>{job.desc}</p>
-                  <button onClick={(e) => { e.stopPropagation(); onNavigate('contact'); }} style={{
-                    display: 'inline-flex', alignItems: 'center', gap: 8, padding: '10px 20px',
-                    background: C.red, color: C.white, fontWeight: 700, fontSize: 13,
-                    borderRadius: 6, border: 'none', cursor: 'pointer', fontFamily: font.sans,
-                  }}>Apply Now <ArrowRight size={14} /></button>
-                </div>
-              )}
+        {/* ── Video Section ── */}
+        {videos.length > 0 && (
+          <div style={{ marginBottom: 40 }}>
+            <h2 style={{ fontFamily: font.serif, fontSize: 22, fontWeight: 700, color: C.gray900, marginBottom: 16 }}>About Our Products</h2>
+            <div style={{ borderRadius: 16, overflow: 'hidden', background: '#000', maxWidth: 720 }}>
+              <video controls style={{ width: '100%', display: 'block' }} poster={videos[0].thumbnail_url || undefined}>
+                <source src={videos[0].video_url || videos[0].url} type="video/mp4" />
+              </video>
             </div>
-          ))}
+            {videos[0].title && <p style={{ fontSize: 13, color: C.gray500, marginTop: 8 }}>{videos[0].title}</p>}
+          </div>
+        )}
+
+        {/* ── Fund Facts Section ── */}
+        <div style={{ marginBottom: 40 }}>
+          <h2 style={{ fontFamily: font.serif, fontSize: 22, fontWeight: 700, color: C.gray900, marginBottom: 16 }}>Fund Fact Sheets</h2>
+
+          {selectedFund != null && fundDetail ? (
+            <div>
+              <button onClick={() => setSelectedFund(null)} style={{
+                display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 14px', borderRadius: 8,
+                background: C.white, border: '1px solid ' + C.gray200, color: C.gray700, fontSize: 13,
+                fontWeight: 600, cursor: 'pointer', fontFamily: font.sans, marginBottom: 20,
+              }}><ChevronLeft size={16} /> Back to All Funds</button>
+
+              <div style={{ background: C.white, borderRadius: 16, padding: isMobile ? 20 : 28, border: '1px solid ' + C.gray100 }}>
+                <h3 style={{ fontFamily: font.serif, fontSize: 20, fontWeight: 700, color: C.gray900, marginBottom: 16 }}>{fundDetail.fund_name}</h3>
+
+                <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 12, marginBottom: 20 }}>
+                  {[
+                    ['Regulator', fundDetail.regulator_short_name],
+                    ['Trustee', fundDetail.trustee],
+                    ['Custodian', fundDetail.custodian],
+                    ['Fund Manager', fundDetail.fund_manager],
+                    ['Min Investment', 'K ' + fundDetail.minimum_investment_amount],
+                    ['Min Period', fundDetail.minimum_investment_period],
+                    ['Risk Profile', fundDetail.risk_profile],
+                    ['Income Policy', fundDetail.income_distribution_policy],
+                    ['Valuation', fundDetail.valuation_frequency],
+                    ['Annual Fee', fundDetail.annual_management_fee + '%'],
+                    ['Initial Fee', fundDetail.initial_fee + '%'],
+                    ['Withdrawal Fee', fundDetail.withdrawal_fee + '%'],
+                    ['Early Withdrawal', fundDetail.early_withdrawal_fee + '%'],
+                  ].map(([label, value]) => (
+                    <div key={label} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid ' + C.gray50 }}>
+                      <span style={{ fontSize: 12, color: C.gray500 }}>{label}</span>
+                      <span style={{ fontSize: 12, fontWeight: 600, color: C.gray800 }}>{value}</span>
+                    </div>
+                  ))}
+                </div>
+
+                {fundDetail.asset_types && fundDetail.asset_types.length > 0 && (
+                  <div style={{ marginBottom: 20 }}>
+                    <h4 style={{ fontSize: 14, fontWeight: 700, color: C.navy, marginBottom: 10 }}>Asset Types</h4>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                      {fundDetail.asset_types.map(a => (
+                        <div key={a.id} title={a.asset_type_description} style={{
+                          padding: '6px 14px', borderRadius: 8, background: C.gray50, border: '1px solid ' + C.gray100,
+                          fontSize: 12, fontWeight: 600, color: C.gray700, cursor: 'help',
+                        }}>{a.asset_type_name}</div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {fundDetail.collection_accounts && fundDetail.collection_accounts.length > 0 && (
+                  <div>
+                    <h4 style={{ fontSize: 14, fontWeight: 700, color: C.navy, marginBottom: 10 }}>Collection Accounts</h4>
+                    {fundDetail.collection_accounts.filter(a => a.is_active).map(acc => (
+                      <div key={acc.id} style={{ padding: 14, borderRadius: 10, background: C.gray50, border: '1px solid ' + C.gray100, marginBottom: 8 }}>
+                        <div style={{ fontSize: 13, fontWeight: 700, color: C.gray900, marginBottom: 4 }}>{acc.bank_name} — {acc.branch_name}</div>
+                        <div style={{ fontSize: 12, color: C.gray600 }}>Account: {acc.account_name}</div>
+                        <div style={{ fontSize: 12, color: C.gray600 }}>Number: {acc.bank_account_number}</div>
+                        <div style={{ fontSize: 11, color: C.gray400 }}>Sort Code: {acc.sort_code}</div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          ) : (
+            <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, 1fr)', gap: 16 }}>
+              {fundFacts.filter(f => f.is_published).map(fund => (
+                <div key={fund.id} onClick={() => setSelectedFund(fund.id)} style={{
+                  background: C.white, borderRadius: 14, padding: 20, border: '1px solid ' + C.gray100,
+                  cursor: 'pointer', transition: 'all 0.2s',
+                }}
+                  onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 8px 24px rgba(0,0,0,0.08)'; e.currentTarget.style.borderColor = C.red; }}
+                  onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = 'none'; e.currentTarget.style.borderColor = C.gray100; }}
+                >
+                  <h3 style={{ fontFamily: font.serif, fontSize: 16, fontWeight: 700, color: C.gray900, marginBottom: 8 }}>{fund.fund_name}</h3>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 12 }}>
+                    <span style={{ fontSize: 10, padding: '3px 8px', borderRadius: 4, background: C.gray50, color: C.gray600, fontWeight: 600 }}>{fund.risk_profile}</span>
+                    <span style={{ fontSize: 10, padding: '3px 8px', borderRadius: 4, background: C.gray50, color: C.gray600, fontWeight: 600 }}>Min K{fund.minimum_investment_amount}</span>
+                    <span style={{ fontSize: 10, padding: '3px 8px', borderRadius: 4, background: C.gray50, color: C.gray600, fontWeight: 600 }}>Fee {fund.annual_management_fee}%</span>
+                  </div>
+                  <div style={{ fontSize: 12, color: C.gray500, marginBottom: 8 }}>Min period: {fund.minimum_investment_period}</div>
+                  <div style={{ fontSize: 11, color: C.red, fontWeight: 600 }}>View Details →</div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
-        {/* General application CTA */}
+        {/* ── FAQs Section ── */}
+        {faqs.length > 0 && (
+          <div style={{ marginBottom: 40 }}>
+            <h2 style={{ fontFamily: font.serif, fontSize: 22, fontWeight: 700, color: C.gray900, marginBottom: 16 }}>Frequently Asked Questions</h2>
+            {faqs.filter(cat => cat.faqs && cat.faqs.length > 0).map(cat => (
+              <div key={cat.id} style={{ marginBottom: 12 }}>
+                <button onClick={() => setOpenCat(openCat === cat.id ? null : cat.id)} style={{
+                  display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%',
+                  padding: '14px 20px', background: C.navy, color: C.white, borderRadius: openCat === cat.id ? '12px 12px 0 0' : 12,
+                  border: 'none', cursor: 'pointer', fontFamily: font.sans, fontSize: 14, fontWeight: 700,
+                }}>
+                  {cat.name}
+                  <ChevronDown size={16} style={{ transform: openCat === cat.id ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
+                </button>
+                {openCat === cat.id && (
+                  <div style={{ background: C.white, border: '1px solid ' + C.gray100, borderRadius: '0 0 12px 12px', overflow: 'hidden' }}>
+                    {cat.faqs.sort((a, b) => a.display_order - b.display_order).map(faq => (
+                      <div key={faq.id} style={{ borderBottom: '1px solid ' + C.gray50 }}>
+                        <button onClick={() => setOpenFaq(openFaq === faq.id ? null : faq.id)} style={{
+                          display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%',
+                          padding: '12px 20px', background: 'transparent', border: 'none', cursor: 'pointer',
+                          fontFamily: font.sans, fontSize: 13, fontWeight: 600, color: C.gray800, textAlign: 'left',
+                        }}>
+                          <span style={{ flex: 1 }}>{faq.question}</span>
+                          <ChevronDown size={14} style={{ color: C.gray400, flexShrink: 0, marginLeft: 8, transform: openFaq === faq.id ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
+                        </button>
+                        {openFaq === faq.id && (
+                          <div style={{ padding: '0 20px 14px', fontSize: 13, color: C.gray600, lineHeight: 1.7 }}>
+                            {faq.answer}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* CTA */}
         <div style={{
-          marginTop: 32, padding: '36px 40px', borderRadius: 16, textAlign: 'center',
-          background: `linear-gradient(135deg, ${C.navy}, ${C.navyDark})`,
+          padding: '36px 40px', borderRadius: 16, textAlign: 'center',
+          background: 'linear-gradient(135deg, ' + C.navy + ', ' + C.navyDark + ')',
         }}>
-          <h3 style={{ fontFamily: font.serif, fontSize: 22, fontWeight: 700, color: C.white, marginBottom: 10 }}>Don't See Your Role?</h3>
-          <p style={{ color: 'rgba(255,255,255,0.65)', fontSize: 14, marginBottom: 20 }}>Send us your CV and we'll keep you in mind for future opportunities.</p>
-          <button onClick={() => onNavigate('contact')} style={{
+          <h3 style={{ fontFamily: font.serif, fontSize: 22, fontWeight: 700, color: C.white, marginBottom: 10 }}>Ready to Invest?</h3>
+          <p style={{ color: 'rgba(255,255,255,0.65)', fontSize: 14, marginBottom: 20 }}>Start your investment journey today with as little as K100.</p>
+          <button onClick={() => onNavigate('portal')} style={{
             display: 'inline-flex', alignItems: 'center', gap: 8, padding: '12px 24px',
             background: C.red, color: C.white, fontWeight: 700, fontSize: 14,
             borderRadius: 8, border: 'none', cursor: 'pointer', fontFamily: font.sans,
-          }}>Send Your CV <ArrowRight size={14} /></button>
+          }}>Open an Account <ArrowRight size={14} /></button>
         </div>
       </div>
     </div>
@@ -3453,7 +3606,6 @@ export default function App() {
   const navItems = [
     { label: 'About', hasDropdown: true, items: [
       { label: 'About Us', action: () => navigate('about', null, 'about') },
-      { label: 'Governance', action: () => navigate('about', null, 'governance') },
       { label: 'Our Team', action: () => navigate('about', null, 'team') },
       { label: 'Core Values', action: () => navigate('about', null, 'values') },
     ]},
@@ -3466,8 +3618,8 @@ export default function App() {
       { label: 'Risk Management', action: () => navigate('products', 'risk') },
     ]},
     { label: 'Insights', action: () => navigate('insights') },
-    { label: 'ROI Calculator', action: () => navigate('tools') },
-    { label: 'Careers', action: () => navigate('careers') },
+    { label: 'Investing With Us', action: () => navigate('investing') },
+    { label: 'Estimate Your Earnings', action: () => navigate('tools') },
   ];
 
   return (
@@ -3546,7 +3698,7 @@ export default function App() {
             }}
               onMouseEnter={e => e.currentTarget.style.background = C.redHover}
               onMouseLeave={e => e.currentTarget.style.background = C.red}
-            >Signup / Login <ArrowUpRight size={12} /></button>
+            >Sign Up <ArrowUpRight size={12} /></button>
           </div>
         )}
 
@@ -3599,7 +3751,7 @@ export default function App() {
               width: '100%', padding: '14px 0', background: C.red, color: C.white,
               fontWeight: 700, fontSize: 14, borderRadius: 8, border: 'none', cursor: 'pointer',
               fontFamily: font.sans, marginTop: 16,
-            }}>Signup / Login <ArrowUpRight size={14} /></button>
+            }}>Sign Up <ArrowUpRight size={14} /></button>
           </div>
         </div>
       )}
@@ -3613,8 +3765,8 @@ export default function App() {
         {page === 'about' && <AboutPage initialTab={aboutTab} />}
         {page === 'contact' && <ContactPage />}
         {page === 'tools' && <ToolsPage onNavigate={navigate} />}
+        {page === 'investing' && <InvestingPage onNavigate={navigate} />}
         {page === 'portal' && <PortalPage />}
-        {page === 'careers' && <CareersPage onNavigate={navigate} />}
       </div>
     </div>
   );

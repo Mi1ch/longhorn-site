@@ -237,7 +237,7 @@ export function AboutPage() {
         <div className="container" style={{ textAlign: 'center' }}>
           <span className="tag">Our Story</span>
           <h1 style={{ fontFamily: 'var(--font-serif)', fontSize: 'clamp(2.5rem, 5vw, 4rem)', fontWeight: 700, color: '#fff', marginBottom: 20 }}>
-            About Longhorn Associates
+            Longhorn Associates
           </h1>
           <p style={{ fontSize: 18, color: 'rgba(255,255,255,0.65)', maxWidth: 620, margin: '0 auto' }}>
             A proudly Zambian investment management company committed to enriching society through superior investment services.
