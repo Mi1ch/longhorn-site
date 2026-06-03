@@ -398,10 +398,16 @@
       "source": "/api/contact/messages",
       "destination": "https://longhorn-api.onrender.com/api/contact/messages/"
     },
+    {
+      "source": "/api/about-section",
+      "destination": "https://longhorn-api.onrender.com/api/about-section/"
+    },
 
     {
       "source": "/api/:path*",
       "destination": "https://longhorn-api.onrender.com/api/:path*"
     }
+
+
   ]
 }
