@@ -290,8 +290,8 @@
       "destination": "https://longhorn-api.onrender.com/api/leadership/categories/"
     },
     {
-      "source": "/api/leadership/members/",
-      "destination": "https://longhorn-api.onrender.com/api/leadership/members/"
+      "source": "/api/leadership/members/:slug",
+      "destination": "https://longhorn-api.onrender.com/api/leadership/members/:slug"
     },
     {
       "source": "/api/leadership/members",

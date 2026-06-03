@@ -1260,7 +1260,7 @@ function FundsTab({ isMobile, onNavigate }) {
           }}
             onMouseEnter={e => e.currentTarget.style.background = C.redHover}
             onMouseLeave={e => e.currentTarget.style.background = C.red}
-          ><Calculator size={14} /> Estimate Your Earnings</button>
+          ><Calculator size={14} /> ROI Calculator</button>
         </div>
 
         {/* Performance Summary — top, full width, darker background */}
@@ -1336,7 +1336,7 @@ function FundsTab({ isMobile, onNavigate }) {
         }}
           onMouseEnter={e => e.currentTarget.style.background = C.redHover}
           onMouseLeave={e => e.currentTarget.style.background = C.red}
-        ><Calculator size={14} /> Estimate Your Earnings</button>
+        ><Calculator size={14} /> ROI Calculator</button>
       </div>
 
       <div style={{ position: 'relative' }}>
@@ -2373,22 +2373,35 @@ function TeamTabContent({ teamTab, setTeamTab, selectedMember, setSelectedMember
   );
 }
 
+
+/* ── Icon name → component mapping for API data ── */
+const ICON_MAP = { Award, Users, Globe, Building2, Shield, TrendingUp, BarChart2, Briefcase, Heart, Star, Target, DollarSign, CheckCircle };
+const getIcon = (name) => ICON_MAP[name] || Globe;
+
 function AboutPage({ initialTab }) {
   const [tab, setTab] = useState(initialTab || 'about');
   const [teamTab, setTeamTab] = useState('board');
   const [selectedMember, setSelectedMember] = useState(null);
+  const [aboutData, setAboutData] = useState(null);
   const isMobile = useIsMobile();
   const tabs = [{ k: 'about', l: 'About Us' }, { k: 'team', l: 'Our Team' }, { k: 'values', l: 'Core Values' }];
 
   useEffect(() => { if (initialTab) setTab(initialTab); }, [initialTab]);
+
+  /* Fetch about section from API */
+  useEffect(() => {
+    cachedFetch('/api/about-section/')
+      .then(data => setAboutData(data))
+      .catch(() => {});
+  }, []);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', minHeight: 'calc(100vh - 64px)' }}>
       <div style={{ background: HEADER_GRADIENT, padding: isMobile ? '24px 20px' : '32px 60px' }}>
         <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', justifyContent: 'space-between', alignItems: isMobile ? 'flex-start' : 'flex-end', gap: isMobile ? 16 : 0 }}>
           <div>
-            <h1 style={{ fontFamily: font.serif, fontSize: isMobile ? 22 : 30, fontWeight: 700, color: C.white }}>Longhorn Associates</h1>
-            <p style={{ fontSize: isMobile ? 12 : 14, color: 'rgba(255,255,255,0.5)', marginTop: 6 }}>A licensed and regulated investment and financial services institution</p>
+            <h1 style={{ fontFamily: font.serif, fontSize: isMobile ? 22 : 30, fontWeight: 700, color: C.white }}>About Longhorn Associates</h1>
+            <p style={{ fontSize: isMobile ? 12 : 14, color: 'rgba(255,255,255,0.5)', marginTop: 6 }}>SEC & PIA Licensed Investment Management Company</p>
           </div>
           <div style={{ display: 'flex', gap: 4 }}>
             {tabs.map(t => (
@@ -2406,15 +2419,19 @@ function AboutPage({ initialTab }) {
 
       <div style={{ flex: 1, padding: isMobile ? '20px 16px' : '32px 60px', background: C.offWhite }}>
 
-        {/* About Us */}
+        {/* About Us — API-driven */}
         {tab === 'about' && (
           <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1.3fr 1fr', gap: 32 }}>
             <div>
               <div style={{ width: 40, height: 3, background: C.red, borderRadius: 2, marginBottom: 16 }} />
-              <h2 style={{ fontFamily: font.serif, fontSize: 24, fontWeight: 700, color: C.gray900, marginBottom: 16 }}>Who We Are</h2>
-              <p style={{ fontSize: 15, color: C.gray600, lineHeight: 1.8, marginBottom: 14 }}>Longhorn Associates is a Securities and Exchange Commission (SEC) and Pensions and Insurance Authority (PIA) licensed Investment Management Company, providing value-adding investment options for clients in Zambia and globally.</p>
-              <p style={{ fontSize: 15, color: C.gray600, lineHeight: 1.8, marginBottom: 20 }}>We are Zambian wholly-owned. Our flagship Retail Collective Investment Scheme (Unit Trust) houses 7 professionally managed funds — from just K100/month — governed by a tripartite structure ensuring your assets are always held separately from the management company.</p>
-              {['SEC & PIA Licensed', 'LuSE Member', 'Zambian Wholly-Owned', '7 Unit Trust Funds', '4 Branches: Lusaka, Ndola, Kitwe, Solwezi'].map(f => (
+              <h2 style={{ fontFamily: font.serif, fontSize: 24, fontWeight: 700, color: C.gray900, marginBottom: 16 }}>{aboutData?.title || 'Who We Are'}</h2>
+              {(aboutData?.description_paragraphs || [
+                'Longhorn Associates is a SEC and PIA licensed Investment Management Company, providing value-adding investment options for clients in Zambia and globally.',
+                'Our flagship Retail Collective Investment Scheme (Unit Trust) houses professionally managed funds governed by a tripartite structure ensuring client assets remain segregated and protected.',
+              ]).map((p, i) => (
+                <p key={i} style={{ fontSize: 15, color: C.gray600, lineHeight: 1.8, marginBottom: i < (aboutData?.description_paragraphs || []).length - 1 ? 14 : 20 }}>{p}</p>
+              ))}
+              {(aboutData?.bullet_points_list || ['SEC & PIA Licensed', 'LuSE Member', 'Zambian Wholly-Owned']).map(f => (
                 <div key={f} style={{ display: 'flex', gap: 10, alignItems: 'center', marginBottom: 10 }}>
                   <CheckCircle size={16} style={{ color: C.green }} />
                   <span style={{ fontSize: 14, color: C.gray600, fontWeight: 500 }}>{f}</span>
@@ -2422,13 +2439,22 @@ function AboutPage({ initialTab }) {
               ))}
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
-              {[{ icon: Award, label: '15+', sub: 'Years in Zambia' }, { icon: Users, label: '500+', sub: 'Investors' }, { icon: Globe, label: '7', sub: 'Trust Funds' }, { icon: Building2, label: '4', sub: 'Branches' }].map(({ icon: Ic, label, sub }, idx) => (
-                <div key={label} style={{ padding: 24, borderRadius: 14, background: C.white, boxShadow: '0 2px 8px rgba(0,0,0,0.06)', textAlign: 'center', marginTop: idx % 2 === 1 ? 20 : 0 }}>
-                  <div style={{ width: 48, height: 48, borderRadius: 12, background: `${C.red}12`, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 12px' }}><Ic size={22} style={{ color: C.red }} /></div>
-                  <div style={{ fontFamily: font.serif, fontSize: 26, fontWeight: 800, color: C.navy }}>{label}</div>
-                  <div style={{ fontSize: 12, color: C.gray400, marginTop: 4, fontWeight: 600 }}>{sub}</div>
-                </div>
-              ))}
+              {(aboutData?.stats || [
+                { display_value: '8', suffix: '+', label: 'Years in Zambia', icon_name: 'Award', display_order: 1 },
+                { display_value: '5000', suffix: '+', label: 'Investors', icon_name: 'Users', display_order: 2 },
+                { display_value: 'Multiple', suffix: null, label: 'Unit Trust Funds', icon_name: 'Globe', display_order: 3 },
+                { display_value: 'Online & Branch Network', suffix: null, label: 'Client Access', icon_name: 'Globe', display_order: 4 },
+              ]).sort((a, b) => a.display_order - b.display_order).map((stat, idx) => {
+                const Ic = getIcon(stat.icon_name);
+                const displayVal = stat.display_value + (stat.suffix || '');
+                return (
+                  <div key={stat.label} style={{ padding: 24, borderRadius: 14, background: C.white, boxShadow: '0 2px 8px rgba(0,0,0,0.06)', textAlign: 'center', marginTop: idx % 2 === 1 ? 20 : 0 }}>
+                    <div style={{ width: 48, height: 48, borderRadius: 12, background: C.red + '12', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 12px' }}><Ic size={22} style={{ color: C.red }} /></div>
+                    <div style={{ fontFamily: font.serif, fontSize: displayVal.length > 6 ? 16 : 26, fontWeight: 800, color: C.navy }}>{displayVal}</div>
+                    <div style={{ fontSize: 12, color: C.gray400, marginTop: 4, fontWeight: 600 }}>{stat.label}</div>
+                  </div>
+                );
+              })}
             </div>
           </div>
         )}
@@ -3097,7 +3123,7 @@ function ToolsPage({ onNavigate }) {
           backgroundImage: `repeating-linear-gradient(90deg, transparent, transparent 60px, rgba(255,255,255,0.03) 60px, rgba(255,255,255,0.03) 61px)`,
           pointerEvents: 'none'
         }} />
-        <h1 style={{ fontFamily: font.serif, fontSize: 30, fontWeight: 700, color: C.white, position: 'relative' }}>Estimate Your Earnings</h1>
+        <h1 style={{ fontFamily: font.serif, fontSize: 30, fontWeight: 700, color: C.white, position: 'relative' }}>ROI Calculator</h1>
         <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.5)', marginTop: 6, position: 'relative' }}>Project your investment growth across our 7 Unit Trust funds</p>
       </div>
       <div style={{ flex: 1, padding: isMobile ? '20px 16px' : '32px 60px', background: C.offWhite }}>
@@ -3110,45 +3136,34 @@ function ToolsPage({ onNavigate }) {
 /* ═══════════════════════════════════════════ */
 /*  SERVICES / PRODUCTS PAGE                   */
 /* ═══════════════════════════════════════════ */
-const servicesList = [
-  { id: 'pension', icon: Shield, label: 'Pension Fund Management', color: C.red, image: '/images/Services/Pension.png',
-    tagline: 'PIA-regulated retirement security',
-    desc: 'Our pension fund management service ensures your retirement savings are professionally managed under strict PIA regulatory oversight. We design bespoke pension solutions for individuals, SMEs, and large corporates — delivering competitive, long-term returns while safeguarding your future.',
-    features: ['PIA-licensed and regulated', 'Corporate and individual schemes', 'Risk-graded investment options', 'Regular actuarial reviews', 'Comprehensive member reporting', 'Flexible contribution structures'] },
-  { id: 'unit-trust', icon: TrendingUp, label: 'Unit Trust Fund Management', color: C.navyLight, image: '/images/Services/Fund.png',
-    tagline: 'SEC-governed collective investment schemes',
-    desc: 'Our SEC-governed Unit Trust pools investor funds into 7 professionally managed portfolios — from equities and bonds to property and education funds. Starting from just K100/month, we make diversified investing accessible to every Zambian through our Retail Collective Investment Scheme.',
-    features: ['SEC authorised and monitored', '7 professionally managed funds', 'Start with as little as K100/month', 'Tripartite governance structure', 'Online portfolio tracking', 'No maximum investment limit'] },
-  { id: 'credit', icon: DollarSign, label: 'Credit', color: C.navyDark, image: '/images/Services/Credit.png',
-    tagline: 'Flexible financing solutions',
-    desc: 'Access tailored credit facilities designed to meet your personal and business funding needs. Backed by our deep understanding of Zambia\'s financial landscape, we provide competitive lending solutions that help you achieve your goals — whether it\'s growing a business, acquiring property, or bridging short-term cash flow gaps.',
-    features: ['Competitive interest rates', 'Flexible repayment terms', 'Personal and business credit', 'Quick turnaround on applications', 'Dedicated credit advisor', 'Transparent fee structure'] },
-  { id: 'securities', icon: BarChart2, label: 'Securities & Stock Broking', color: C.red, image: '/images/Services/Broker.png',
-    tagline: 'Trade on the Lusaka Securities Exchange',
-    desc: 'Buy and sell equities listed on the Lusaka Securities Exchange (LuSE) with expert guidance from our licensed brokers. We provide real-time market insights, research-driven recommendations, and efficient trade execution to help you build and manage your equity portfolio.',
-    features: ['Licensed LuSE broker', 'Real-time market data and insights', 'Research-driven trade recommendations', 'Efficient order execution', 'Portfolio monitoring and reporting', 'Access to IPOs and rights issues'] },
-  { id: 'advisory', icon: Briefcase, label: 'Consultancy & Advisory', color: C.navyLight, image: '/images/Services/Consult.png',
-    tagline: 'Expert financial guidance',
-    desc: 'Our licensed advisors provide personalised, objective investment guidance — from portfolio structuring and market analysis to comprehensive financial planning. Whether you are a first-time investor or a seasoned professional, we give you the insight and strategies you need to make confident financial decisions.',
-    features: ['Licensed, independent advisors', 'Comprehensive financial needs analysis', 'Market research and commentary', 'Investment proposal and planning', 'Ongoing monitoring and review', 'Multi-asset class coverage'] },
-  { id: 'risk', icon: AlertTriangle, label: 'Risk Management', color: C.navyDark, image: '/images/Services/Risk.png',
-    tagline: 'Protect and preserve your wealth',
-    desc: 'We identify, assess and mitigate financial risks across your portfolio using robust, institutional-grade frameworks. Our risk management service ensures your wealth is protected against market volatility, currency fluctuations, and economic uncertainty — giving you peace of mind as your investments grow.',
-    features: ['Comprehensive risk assessment', 'Portfolio stress testing', 'Currency and market risk mitigation', 'Regulatory compliance oversight', 'Ongoing risk monitoring', 'Custom risk reporting'] },
-];
+/* servicesList is now fetched from API — see ServicesPage */
+const SERVICE_COLORS = [C.red, C.navyLight, C.navyDark, C.red, C.navyLight, C.navyDark];
 
 function ServicesPage({ onNavigate, serviceId }) {
-  const [detailId, setDetailId] = useState(null);
-  const detail = servicesList.find(s => s.id === detailId);
+  const [services, setServices] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [detailSlug, setDetailSlug] = useState(null);
   const isMobile = useIsMobile();
 
   useEffect(() => {
-    if (serviceId) {
+    let cancelled = false;
+    cachedFetch('/api/service-pages/')
+      .then(data => {
+        if (cancelled) return;
+        const sorted = (Array.isArray(data) ? data : []).sort((a, b) => a.display_order - b.display_order);
+        setServices(sorted);
+        setLoading(false);
+      })
+      .catch(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, []);
+
+  /* Scroll to service card when arriving from nav */
+  useEffect(() => {
+    if (serviceId && services.length > 0) {
       setTimeout(() => {
-        const el = document.getElementById(`svc-${serviceId}`);
+        const el = document.getElementById('svc-' + serviceId);
         if (el) {
-          /* Find the scrollable parent (scrollRef div) instead of using scrollIntoView
-             which can scroll the entire viewport on mobile and hide the nav bar */
           const scrollParent = el.closest('[data-scroll-container]') || el.closest('div[style*="overflow"]');
           if (scrollParent) {
             const elRect = el.getBoundingClientRect();
@@ -3160,55 +3175,72 @@ function ServicesPage({ onNavigate, serviceId }) {
         }
       }, 300);
     }
-  }, [serviceId]);
+  }, [serviceId, services]);
 
-  /* ── Service Detail View ── */
-  if (detail) {
-    const Icon = detail.icon;
+  const detail = services.find(s => s.product_slug === detailSlug);
+
+  if (loading) {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', minHeight: 'calc(100vh - 64px)' }}>
         <MarketTicker />
-        <div style={{ background: HEADER_GRADIENT, padding: '32px 60px' }}>
-          <button onClick={() => setDetailId(null)} style={{
+        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', background: C.offWhite }}>
+          <div style={{ textAlign: 'center', color: C.gray400, fontSize: 14 }}>Loading services…</div>
+        </div>
+      </div>
+    );
+  }
+
+  /* ── Service Detail View ── */
+  if (detail) {
+    const color = SERVICE_COLORS[detail.display_order % SERVICE_COLORS.length] || C.red;
+    const features = detail.bullet_points_list || [];
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', minHeight: 'calc(100vh - 64px)' }}>
+        <MarketTicker />
+        <div style={{ background: HEADER_GRADIENT, padding: isMobile ? '24px 20px' : '32px 60px' }}>
+          <button onClick={() => setDetailSlug(null)} style={{
             display: 'inline-flex', alignItems: 'center', gap: 6, padding: '6px 14px', borderRadius: 6,
             background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.2)',
             color: '#fff', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: font.sans, marginBottom: 16,
           }}>
             <ChevronLeft size={14} /> Back to Services
           </button>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-            <div style={{ width: 56, height: 56, borderRadius: 16, background: `${detail.color}25`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <Icon size={28} style={{ color: '#fff' }} />
-            </div>
-            <div>
-              <h1 style={{ fontFamily: font.serif, fontSize: 28, fontWeight: 700, color: C.white }}>{detail.label}</h1>
-              <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.6)', marginTop: 4 }}>{detail.tagline}</p>
-            </div>
+          <div>
+            <h1 style={{ fontFamily: font.serif, fontSize: isMobile ? 22 : 28, fontWeight: 700, color: C.white }}>{detail.title}</h1>
+            <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.6)', marginTop: 4 }}>{detail.subtitle}</p>
           </div>
         </div>
         <div style={{ flex: 1, padding: isMobile ? '20px 16px' : '40px 60px', background: C.offWhite }}>
           <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1.6fr 1fr', gap: 32 }}>
             <div>
-              <img src={detail.image} alt={detail.label} style={{ width: '100%', height: 280, objectFit: 'cover', borderRadius: 16, marginBottom: 28 }} />
+              {detail.image_url && (
+                <img src={detail.image_url} alt={detail.title} style={{ width: '100%', height: 280, objectFit: 'cover', borderRadius: 16, marginBottom: 28 }} />
+              )}
               <h2 style={{ fontFamily: font.serif, fontSize: 22, fontWeight: 700, color: C.gray900, marginBottom: 16 }}>About This Service</h2>
-              <p style={{ fontSize: 15, color: C.gray600, lineHeight: 1.8, marginBottom: 24 }}>{detail.desc}</p>
-              <h3 style={{ fontSize: 16, fontWeight: 700, color: C.gray900, marginBottom: 14 }}>Key Features</h3>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 32 }}>
-                {detail.features.map(f => (
-                  <div key={f} style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
-                    <CheckCircle size={14} style={{ color: detail.color, marginTop: 3, flexShrink: 0 }} />
-                    <span style={{ fontSize: 14, color: C.gray600, lineHeight: 1.5 }}>{f}</span>
+              {(detail.description_paragraphs || [detail.description]).map((p, pi) => (
+                <p key={pi} style={{ fontSize: 15, color: C.gray600, lineHeight: 1.8, marginBottom: 14 }}>{p}</p>
+              ))}
+              {features.length > 0 && (
+                <>
+                  <h3 style={{ fontSize: 16, fontWeight: 700, color: C.gray900, marginBottom: 14, marginTop: 10 }}>Key Features</h3>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 32 }}>
+                    {features.map(f => (
+                      <div key={f} style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+                        <CheckCircle size={14} style={{ color, marginTop: 3, flexShrink: 0 }} />
+                        <span style={{ fontSize: 14, color: C.gray600, lineHeight: 1.5 }}>{f}</span>
+                      </div>
+                    ))}
                   </div>
-                ))}
-              </div>
+                </>
+              )}
               <button onClick={() => onNavigate('contact')} style={{
                 display: 'inline-flex', alignItems: 'center', gap: 8, padding: '14px 28px',
-                background: detail.color, color: C.white, fontWeight: 700, fontSize: 14,
+                background: color, color: C.white, fontWeight: 700, fontSize: 14,
                 borderRadius: 8, border: 'none', cursor: 'pointer', fontFamily: font.sans,
               }}>Enquire Now <ArrowRight size={14} /></button>
             </div>
             <div>
-              <div style={{ padding: 24, borderRadius: 16, background: C.white, border: `1px solid ${C.gray100}`, marginBottom: 20 }}>
+              <div style={{ padding: 24, borderRadius: 16, background: C.white, border: '1px solid ' + C.gray100, marginBottom: 20 }}>
                 <h3 style={{ fontSize: 16, fontWeight: 700, color: C.gray900, marginBottom: 16 }}>How It Works</h3>
                 {[
                   { step: 1, text: 'Contact our team for a personalised consultation' },
@@ -3217,12 +3249,12 @@ function ServicesPage({ onNavigate, serviceId }) {
                   { step: 4, text: 'Begin your investment journey with expert support' },
                 ].map(({ step, text }) => (
                   <div key={step} style={{ display: 'flex', gap: 12, marginBottom: 14 }}>
-                    <div style={{ width: 32, height: 32, borderRadius: 8, background: `${detail.color}15`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: font.serif, fontWeight: 700, fontSize: 14, color: detail.color, flexShrink: 0 }}>{step}</div>
+                    <div style={{ width: 32, height: 32, borderRadius: 8, background: color + '15', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: font.serif, fontWeight: 700, fontSize: 14, color, flexShrink: 0 }}>{step}</div>
                     <p style={{ fontSize: 13, color: C.gray600, lineHeight: 1.6, marginTop: 6 }}>{text}</p>
                   </div>
                 ))}
               </div>
-              <div style={{ padding: 24, borderRadius: 16, background: `linear-gradient(135deg, ${C.navy}, ${C.navyDark})`, color: C.white }}>
+              <div style={{ padding: 24, borderRadius: 16, background: 'linear-gradient(135deg, ' + C.navy + ', ' + C.navyDark + ')', color: C.white }}>
                 <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 8 }}>Need Help Choosing?</h3>
                 <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.7)', lineHeight: 1.6, marginBottom: 16 }}>Our advisors can help you find the right service for your goals.</p>
                 <button onClick={() => onNavigate('contact')} style={{
@@ -3238,10 +3270,10 @@ function ServicesPage({ onNavigate, serviceId }) {
     );
   }
 
+  /* ── Service List View ── */
   return (
     <div style={{ display: 'flex', flexDirection: 'column', minHeight: 'calc(100vh - 64px)' }}>
       <MarketTicker />
-      {/* Header */}
       <div style={{
         background: HEADER_GRADIENT,
         padding: isMobile ? '24px 20px' : '40px 60px', position: 'relative', overflow: 'hidden',
@@ -3254,106 +3286,97 @@ function ServicesPage({ onNavigate, serviceId }) {
         <div style={{ position: 'relative', zIndex: 1, textAlign: 'center' }}>
           <h1 style={{ fontFamily: font.serif, fontSize: 32, fontWeight: 700, color: C.white, marginBottom: 8 }}>Our Services</h1>
           <p style={{ fontSize: 15, color: 'rgba(255,255,255,0.6)', maxWidth: 520, margin: '0 auto 24px' }}>
-            Six core services designed to manage, grow, and protect your wealth — from pension planning to securities trading.
+            Core services designed to manage, grow, and protect your wealth — from pension planning to securities trading.
           </p>
           <div style={{ display: 'flex', gap: 8, justifyContent: 'center', flexWrap: 'wrap' }}>
-            {servicesList.map(s => (
-              <a key={s.id} href={`#svc-${s.id}`} style={{
+            {services.map(s => (
+              <a key={s.product_slug} href={'#svc-' + s.product_slug} style={{
                 padding: '6px 14px', borderRadius: 100, fontSize: 12, fontWeight: 600,
                 background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.2)',
-                color: '#fff', transition: 'all 0.2s', cursor: 'pointer',
+                color: '#fff', transition: 'all 0.2s', cursor: 'pointer', textDecoration: 'none',
               }}
                 onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.2)'}
                 onMouseLeave={e => e.currentTarget.style.background = 'rgba(255,255,255,0.1)'}
-              >{s.label}</a>
+              >{s.product_name}</a>
             ))}
           </div>
         </div>
       </div>
 
-      {/* Service cards */}
       <div style={{ flex: 1, padding: isMobile ? '20px 16px' : '40px 60px', background: C.offWhite }}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 32 }}>
-          {servicesList.map(({ id, icon: Icon, label, tagline, desc, features, color, image }, i) => (
-            <div key={id} id={`svc-${id}`} style={{
-              display: 'grid', gridTemplateColumns: isMobile ? '1fr' : (i % 2 === 0 ? '1fr 1.6fr' : '1.6fr 1fr'),
-              background: C.white, borderRadius: 16, overflow: 'hidden',
-              boxShadow: '0 2px 8px rgba(0,0,0,0.06)', border: `1px solid ${C.gray100}`,
-            }}>
-              {/* Image panel — left on even, right on odd */}
-              {i % 2 === 0 && (
-                <div style={{ position: 'relative', overflow: 'hidden', minHeight: 280 }}>
-                  <img src={image} alt={label} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
-                  <div style={{ position: 'absolute', inset: 0, background: `linear-gradient(180deg, transparent 40%, ${color}cc 100%)`, pointerEvents: 'none' }} />
-                  <div style={{ position: 'absolute', bottom: 20, left: 0, right: 0, textAlign: 'center' }}>
-                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '8px 16px', borderRadius: 8, background: 'rgba(0,0,0,0.3)', backdropFilter: 'blur(4px)' }}>
-                      <Icon size={14} style={{ color: '#fff' }} />
-                      <span style={{ fontSize: 12, fontWeight: 700, color: '#fff' }}>{label}</span>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Text content */}
-              <div style={{ padding: 40 }}>
-                {i % 2 !== 0 && (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 20 }}>
-                    <div style={{ width: 52, height: 52, borderRadius: 14, background: `${color}15`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                      <Icon size={24} style={{ color }} />
-                    </div>
-                    <div>
-                      <h3 style={{ fontFamily: font.serif, fontSize: 22, fontWeight: 700, color: C.gray900 }}>{label}</h3>
-                      <p style={{ fontSize: 13, color, fontWeight: 600 }}>{tagline}</p>
+          {services.map((svc, i) => {
+            const color = SERVICE_COLORS[i % SERVICE_COLORS.length] || C.red;
+            const features = svc.bullet_points_list || [];
+            const slug = svc.product_slug;
+            return (
+              <div key={slug} id={'svc-' + slug} style={{
+                display: 'grid', gridTemplateColumns: isMobile ? '1fr' : (i % 2 === 0 ? '1fr 1.6fr' : '1.6fr 1fr'),
+                background: C.white, borderRadius: 16, overflow: 'hidden',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.06)', border: '1px solid ' + C.gray100,
+              }}>
+                {/* Image panel — left on even */}
+                {i % 2 === 0 && svc.image_url && (
+                  <div style={{ position: 'relative', overflow: 'hidden', minHeight: 280 }}>
+                    <img src={svc.image_url} alt={svc.title} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                    <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, transparent 40%, ' + color + 'cc 100%)', pointerEvents: 'none' }} />
+                    <div style={{ position: 'absolute', bottom: 20, left: 0, right: 0, textAlign: 'center' }}>
+                      <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '8px 16px', borderRadius: 8, background: 'rgba(0,0,0,0.3)', backdropFilter: 'blur(4px)' }}>
+                        <span style={{ fontSize: 12, fontWeight: 700, color: '#fff' }}>{svc.product_name}</span>
+                      </div>
                     </div>
                   </div>
                 )}
-                {i % 2 === 0 && (
+
+                {/* Text content */}
+                <div style={{ padding: isMobile ? 24 : 40 }}>
                   <div style={{ marginBottom: 20 }}>
-                    <h3 style={{ fontFamily: font.serif, fontSize: 22, fontWeight: 700, color: C.gray900, marginBottom: 4 }}>{label}</h3>
-                    <p style={{ fontSize: 13, color, fontWeight: 600 }}>{tagline}</p>
+                    <h3 style={{ fontFamily: font.serif, fontSize: 22, fontWeight: 700, color: C.gray900, marginBottom: 4 }}>{svc.title}</h3>
+                    <p style={{ fontSize: 13, color, fontWeight: 600 }}>{svc.subtitle}</p>
+                  </div>
+                  <p style={{ fontSize: 15, color: C.gray600, lineHeight: 1.8, marginBottom: 24 }}>{svc.description}</p>
+                  {features.length > 0 && (
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 24 }}>
+                      {features.map(f => (
+                        <div key={f} style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+                          <CheckCircle size={14} style={{ color, marginTop: 3, flexShrink: 0 }} />
+                          <span style={{ fontSize: 13, color: C.gray600, lineHeight: 1.5 }}>{f}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  <button onClick={() => setDetailSlug(slug)} style={{
+                    display: 'inline-flex', alignItems: 'center', gap: 8, padding: '12px 24px',
+                    background: color, color: C.white, fontWeight: 700, fontSize: 13,
+                    borderRadius: 6, border: 'none', cursor: 'pointer', fontFamily: font.sans,
+                    transition: 'all 0.2s',
+                  }}
+                    onMouseEnter={e => e.currentTarget.style.opacity = '0.85'}
+                    onMouseLeave={e => e.currentTarget.style.opacity = '1'}
+                  >Read More <ArrowRight size={14} /></button>
+                </div>
+
+                {/* Image panel — right on odd */}
+                {i % 2 !== 0 && svc.image_url && (
+                  <div style={{ position: 'relative', overflow: 'hidden', minHeight: 280 }}>
+                    <img src={svc.image_url} alt={svc.title} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                    <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, transparent 40%, ' + color + 'cc 100%)', pointerEvents: 'none' }} />
+                    <div style={{ position: 'absolute', bottom: 20, left: 0, right: 0, textAlign: 'center' }}>
+                      <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '8px 16px', borderRadius: 8, background: 'rgba(0,0,0,0.3)', backdropFilter: 'blur(4px)' }}>
+                        <span style={{ fontSize: 12, fontWeight: 700, color: '#fff' }}>{svc.product_name}</span>
+                      </div>
+                    </div>
                   </div>
                 )}
-                <p style={{ fontSize: 15, color: C.gray600, lineHeight: 1.8, marginBottom: 24 }}>{desc}</p>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 24 }}>
-                  {features.map(f => (
-                    <div key={f} style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
-                      <CheckCircle size={14} style={{ color, marginTop: 3, flexShrink: 0 }} />
-                      <span style={{ fontSize: 13, color: C.gray600, lineHeight: 1.5 }}>{f}</span>
-                    </div>
-                  ))}
-                </div>
-                <button onClick={() => setDetailId(id)} style={{
-                  display: 'inline-flex', alignItems: 'center', gap: 8, padding: '12px 24px',
-                  background: color, color: C.white, fontWeight: 700, fontSize: 13,
-                  borderRadius: 6, border: 'none', cursor: 'pointer', fontFamily: font.sans,
-                  transition: 'all 0.2s',
-                }}
-                  onMouseEnter={e => e.currentTarget.style.opacity = '0.85'}
-                  onMouseLeave={e => e.currentTarget.style.opacity = '1'}
-                >Read More <ArrowRight size={14} /></button>
               </div>
-
-              {/* Image panel — right on odd */}
-              {i % 2 !== 0 && (
-                <div style={{ position: 'relative', overflow: 'hidden', minHeight: 280 }}>
-                  <img src={image} alt={label} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
-                  <div style={{ position: 'absolute', inset: 0, background: `linear-gradient(180deg, transparent 40%, ${color}cc 100%)`, pointerEvents: 'none' }} />
-                  <div style={{ position: 'absolute', bottom: 20, left: 0, right: 0, textAlign: 'center' }}>
-                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '8px 16px', borderRadius: 8, background: 'rgba(0,0,0,0.3)', backdropFilter: 'blur(4px)' }}>
-                      <Icon size={14} style={{ color: '#fff' }} />
-                      <span style={{ fontSize: 12, fontWeight: 700, color: '#fff' }}>{label}</span>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-          ))}
+            );
+          })}
         </div>
 
         {/* CTA */}
         <div style={{
           marginTop: 40, padding: '48px 40px', borderRadius: 16, textAlign: 'center',
-          background: `linear-gradient(135deg, ${C.navy}, ${C.navyDark})`,
+          background: 'linear-gradient(135deg, ' + C.navy + ', ' + C.navyDark + ')',
         }}>
           <h2 style={{ fontFamily: font.serif, fontSize: 26, fontWeight: 700, color: C.white, marginBottom: 12 }}>Not Sure Where to Start?</h2>
           <p style={{ color: 'rgba(255,255,255,0.65)', fontSize: 15, marginBottom: 28 }}>Our advisors will help you find the right service for your goals.</p>
@@ -3370,7 +3393,6 @@ function ServicesPage({ onNavigate, serviceId }) {
     </div>
   );
 }
-
 
 /* ═══════════════════════════════════════════ */
 /*  INVESTING WITH US PAGE                     */
@@ -3581,8 +3603,19 @@ export default function App() {
   const [aboutTab, setAboutTab] = useState('about');
   const [serviceId, setServiceId] = useState(null);
   const [mobileMenu, setMobileMenu] = useState(false);
+  const [navProducts, setNavProducts] = useState([]);
   const scrollRef = useRef(null);
   const isMobile = useIsMobile();
+
+  /* Fetch product names for nav dropdown */
+  useEffect(() => {
+    cachedFetch('/api/service-pages/products/')
+      .then(data => {
+        const items = (Array.isArray(data) ? data : []).sort((a, b) => a.display_order - b.display_order);
+        setNavProducts(items);
+      })
+      .catch(() => {});
+  }, []);
 
   const navigate = useCallback((p, fId, tab) => {
     if (p === 'fund') {
@@ -3609,17 +3642,13 @@ export default function App() {
       { label: 'Our Team', action: () => navigate('about', null, 'team') },
       { label: 'Core Values', action: () => navigate('about', null, 'values') },
     ]},
-    { label: 'Products', hasDropdown: true, items: [
-      { label: 'Pension Fund Management', action: () => navigate('products', 'pension') },
-      { label: 'Unit Trust Fund Management', action: () => navigate('products', 'unit-trust') },
-      { label: 'Credit', action: () => navigate('products', 'credit') },
-      { label: 'Securities & Stock Broking', action: () => navigate('products', 'securities') },
-      { label: 'Consultancy & Advisory', action: () => navigate('products', 'advisory') },
-      { label: 'Risk Management', action: () => navigate('products', 'risk') },
-    ]},
+    { label: 'Products', hasDropdown: true, items: navProducts.length > 0
+      ? navProducts.map(p => ({ label: p.name, action: () => navigate('products', p.slug) }))
+      : [{ label: 'Loading…', action: () => navigate('products') }]
+    },
     { label: 'Insights', action: () => navigate('insights') },
     { label: 'Investing With Us', action: () => navigate('investing') },
-    { label: 'Estimate Your Earnings', action: () => navigate('tools') },
+    { label: 'ROI Calculator', action: () => navigate('tools') },
   ];
 
   return (
