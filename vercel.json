@@ -402,6 +402,14 @@
       "source": "/api/about-section",
       "destination": "https://longhorn-api.onrender.com/api/about-section/"
     },
+    {
+      "source": "/api/service-pages/products",
+      "destination": "https://longhorn-api.onrender.com/api/service-pages/products/"
+    },
+    {
+      "source": "/api/service-pages",
+      "destination": "https://longhorn-api.onrender.com/api/service-pages/"
+    },
 
     {
       "source": "/api/:path*",
