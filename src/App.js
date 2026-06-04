@@ -1260,7 +1260,7 @@ function FundsTab({ isMobile, onNavigate }) {
           }}
             onMouseEnter={e => e.currentTarget.style.background = C.redHover}
             onMouseLeave={e => e.currentTarget.style.background = C.red}
-          ><Calculator size={14} /> ROI Calculator</button>
+          ><Calculator size={14} /> Estimate Your Earnings</button>
         </div>
 
         {/* Performance Summary — top, full width, darker background */}
@@ -1336,7 +1336,7 @@ function FundsTab({ isMobile, onNavigate }) {
         }}
           onMouseEnter={e => e.currentTarget.style.background = C.redHover}
           onMouseLeave={e => e.currentTarget.style.background = C.red}
-        ><Calculator size={14} /> ROI Calculator</button>
+        ><Calculator size={14} /> Estimate Your Earnings</button>
       </div>
 
       <div style={{ position: 'relative' }}>
@@ -1959,7 +1959,7 @@ function NewsTab({ isMobile }) {
               display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10,
             }}><X size={18} style={{ color: '#374151' }} /></button>
             {selectedPost.cover_image_url ? (
-              <img src={selectedPost.cover_image_url} alt={selectedPost.title} style={{ width: '100%', height: 220, objectFit: 'cover' }} />
+              <img src={selectedPost.cover_image_url} alt={selectedPost.title} style={{ width: '100%', display: 'block', borderRadius: '20px 20px 0 0' }} />
             ) : (
               <div style={{ height: 140, background: `linear-gradient(135deg, ${C.navy}, ${C.navyLight})`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <Newspaper size={40} style={{ color: 'rgba(255,255,255,0.3)' }} />
@@ -2664,7 +2664,7 @@ function PortalRegister({ isMobile }) {
   const [applicantType, setApplicantType] = useState('');
   const [kyc, setKyc] = useState({});
   const [files, setFiles] = useState({});
-  const [unitTrust, setUnitTrust] = useState({ fundName: '', beneficiary: false, beneficiaryName: '', relationshipWithBeneficiary: '', beneficiaryDOB: '' });
+  const [accountRequests, setAccountRequests] = useState([{ fundName: '', beneficiary: false, beneficiaryName: '', relationshipWithBeneficiary: '', beneficiaryDOB: '' }]);
   const [credit, setCredit] = useState({ loanType: '', loanAmount: '' });
 
   useEffect(() => {
@@ -2741,15 +2741,18 @@ function PortalRegister({ isMobile }) {
     if (files.proofOfResidence) fd.append('mainKycForm[proofOfResidence]', files.proofOfResidence);
     if (files.referenceLetter) fd.append('mainKycForm[referenceLetter]', files.referenceLetter);
 
-    /* 4. Unit Trust account request */
+    /* 4. Unit Trust account requests — one per fund */
     if (isUnitTrust) {
-      fd.append('unitTrustApplication[accountRequests][0][fundName]', unitTrust.fundName);
-      fd.append('unitTrustApplication[accountRequests][0][beneficiary]', String(unitTrust.beneficiary));
-      if (unitTrust.beneficiary) {
-        fd.append('unitTrustApplication[accountRequests][0][beneficiaryName]', unitTrust.beneficiaryName);
-        fd.append('unitTrustApplication[accountRequests][0][relationshipWithBeneficiary]', unitTrust.relationshipWithBeneficiary);
-        fd.append('unitTrustApplication[accountRequests][0][beneficiaryDOB]', unitTrust.beneficiaryDOB);
-      }
+      accountRequests.forEach((req, idx) => {
+        if (!req.fundName) return;
+        fd.append(`unitTrustApplication[accountRequests][${idx}][fundName]`, req.fundName);
+        fd.append(`unitTrustApplication[accountRequests][${idx}][beneficiary]`, String(req.beneficiary));
+        if (req.beneficiary) {
+          fd.append(`unitTrustApplication[accountRequests][${idx}][beneficiaryName]`, req.beneficiaryName);
+          fd.append(`unitTrustApplication[accountRequests][${idx}][relationshipWithBeneficiary]`, req.relationshipWithBeneficiary);
+          fd.append(`unitTrustApplication[accountRequests][${idx}][beneficiaryDOB]`, req.beneficiaryDOB);
+        }
+      });
     }
 
     /* 5. Credit application */
@@ -2829,7 +2832,7 @@ function PortalRegister({ isMobile }) {
           ))}
         </div>
         <div>
-          <button onClick={() => { setSuccess(null); setStep(1); setProduct(''); setApplicantType(''); setKyc({}); setFiles({}); setUnitTrust({ fundName: '', beneficiary: false, beneficiaryName: '', relationshipWithBeneficiary: '', beneficiaryDOB: '' }); setCredit({ loanType: '', loanAmount: '' }); }} style={{
+          <button onClick={() => { setSuccess(null); setStep(1); setProduct(''); setApplicantType(''); setKyc({}); setFiles({}); setAccountRequests([{ fundName: '', beneficiary: false, beneficiaryName: '', relationshipWithBeneficiary: '', beneficiaryDOB: '' }]); setCredit({ loanType: '', loanAmount: '' }); }} style={{
             padding: '12px 28px', background: C.navy, color: C.white, fontWeight: 700, fontSize: 14,
             borderRadius: 8, border: 'none', cursor: 'pointer', fontFamily: font.sans,
           }}>Submit Another Application</button>
@@ -2989,22 +2992,67 @@ function PortalRegister({ isMobile }) {
           {isUnitTrust && (
             <div style={{ marginBottom: 20 }}>
               <div style={{ fontSize: 12, fontWeight: 700, color: C.navy, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 10 }}>Fund Selection</div>
-              {IF({ label: 'Fund Name', name: 'fundName', required: true, options: lookups.funds, value: unitTrust.fundName, onChange: v => setUnitTrust(p => ({ ...p, fundName: v })) })}
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
-                <label style={{ fontSize: 13, color: C.gray700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <input type="checkbox" checked={unitTrust.beneficiary} onChange={e => setUnitTrust(p => ({ ...p, beneficiary: e.target.checked, beneficiaryName: e.target.checked ? p.beneficiaryName : '', relationshipWithBeneficiary: e.target.checked ? p.relationshipWithBeneficiary : '', beneficiaryDOB: e.target.checked ? p.beneficiaryDOB : '' }))} style={{ accentColor: C.red }} />
-                  Add a beneficiary to this account
-                </label>
-              </div>
-              {unitTrust.beneficiary && (
-                <div style={{ padding: '14px 16px', borderRadius: 10, background: C.gray50, border: `1px solid ${C.gray100}`, marginBottom: 12 }}>
-                  {IF({ label: 'Beneficiary Name', name: 'beneficiaryName', required: true, value: unitTrust.beneficiaryName, onChange: v => setUnitTrust(p => ({ ...p, beneficiaryName: v })) })}
-                  <div style={S.grid2}>
-                    {IF({ label: 'Relationship', name: 'relationshipWithBeneficiary', required: true, value: unitTrust.relationshipWithBeneficiary, onChange: v => setUnitTrust(p => ({ ...p, relationshipWithBeneficiary: v })), placeholder: 'e.g. Child, Spouse' })}
-                    {IF({ label: 'Beneficiary DOB', name: 'beneficiaryDOB', type: 'date', required: true, value: unitTrust.beneficiaryDOB, onChange: v => setUnitTrust(p => ({ ...p, beneficiaryDOB: v })) })}
+              {accountRequests.map((req, idx) => {
+                const updateReq = (key, val) => setAccountRequests(prev => prev.map((r, i) => i === idx ? { ...r, [key]: val } : r));
+                const removeReq = () => setAccountRequests(prev => prev.filter((_, i) => i !== idx));
+                return (
+                  <div key={idx} style={{
+                    padding: '16px 18px', borderRadius: 12, marginBottom: 12,
+                    background: idx > 0 ? C.gray50 : 'transparent',
+                    border: idx > 0 ? `1px solid ${C.gray100}` : 'none',
+                  }}>
+                    {/* Fund header with number and remove button */}
+                    {accountRequests.length > 1 && (
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                        <span style={{ fontSize: 12, fontWeight: 700, color: C.navy }}>Fund {idx + 1}</span>
+                        {idx > 0 && (
+                          <button onClick={removeReq} style={{
+                            display: 'inline-flex', alignItems: 'center', gap: 4, padding: '4px 10px',
+                            borderRadius: 6, background: `${C.red}10`, border: 'none', cursor: 'pointer',
+                            fontSize: 11, fontWeight: 600, color: C.red, fontFamily: font.sans,
+                          }}>
+                            <X size={12} /> Remove
+                          </button>
+                        )}
+                      </div>
+                    )}
+
+                    {IF({ label: accountRequests.length > 1 ? `Fund Name` : 'Fund Name', name: `fundName-${idx}`, required: true, options: lookups.funds, value: req.fundName, onChange: v => updateReq('fundName', v) })}
+
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
+                      <label style={{ fontSize: 13, color: C.gray700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <input type="checkbox" checked={req.beneficiary} onChange={e => {
+                          const checked = e.target.checked;
+                          updateReq('beneficiary', checked);
+                          if (!checked) { updateReq('beneficiaryName', ''); updateReq('relationshipWithBeneficiary', ''); updateReq('beneficiaryDOB', ''); }
+                        }} style={{ accentColor: C.red }} />
+                        Add a beneficiary to this account
+                      </label>
+                    </div>
+
+                    {req.beneficiary && (
+                      <div style={{ padding: '14px 16px', borderRadius: 10, background: C.white, border: `1px solid ${C.gray100}`, marginBottom: 4 }}>
+                        {IF({ label: 'Beneficiary Name', name: `beneficiaryName-${idx}`, required: true, value: req.beneficiaryName, onChange: v => updateReq('beneficiaryName', v) })}
+                        <div style={S.grid2}>
+                          {IF({ label: 'Relationship', name: `relationship-${idx}`, required: true, value: req.relationshipWithBeneficiary, onChange: v => updateReq('relationshipWithBeneficiary', v), placeholder: 'e.g. Child, Spouse' })}
+                          {IF({ label: 'Beneficiary DOB', name: `beneficiaryDOB-${idx}`, type: 'date', required: true, value: req.beneficiaryDOB, onChange: v => updateReq('beneficiaryDOB', v) })}
+                        </div>
+                      </div>
+                    )}
                   </div>
-                </div>
-              )}
+                );
+              })}
+
+              {/* Add Another Fund button */}
+              <button onClick={() => setAccountRequests(prev => [...prev, { fundName: '', beneficiary: false, beneficiaryName: '', relationshipWithBeneficiary: '', beneficiaryDOB: '' }])} style={{
+                display: 'inline-flex', alignItems: 'center', gap: 8, padding: '10px 18px',
+                borderRadius: 8, border: `1.5px dashed ${C.navy}40`, background: `${C.navy}06`,
+                color: C.navy, fontSize: 13, fontWeight: 600, cursor: 'pointer',
+                fontFamily: font.sans, transition: 'all 0.2s', width: '100%', justifyContent: 'center',
+              }}
+                onMouseEnter={e => { e.currentTarget.style.background = `${C.navy}12`; e.currentTarget.style.borderColor = C.navy; }}
+                onMouseLeave={e => { e.currentTarget.style.background = `${C.navy}06`; e.currentTarget.style.borderColor = `${C.navy}40`; }}
+              >+ Add Another Fund</button>
             </div>
           )}
 
@@ -3068,7 +3116,7 @@ function PortalRegister({ isMobile }) {
               : [['Company', kyc.companyName], ['Reg. No.', kyc.companyIDNumber], ['Contact', kyc.contactPerson], ['Email', kyc.emailAddress], ['Phone', kyc.phoneNumber], ['Address', kyc.physicalAddress]]
             },
             { title: 'Banking', rows: [['Bank', kyc.bankName], ['Account', `${kyc.bankAccountName || ''} — ${kyc.bankAccountNumber || ''}`]] },
-            ...(isUnitTrust ? [{ title: 'Unit Trust', rows: [['Fund', unitTrust.fundName], ['Beneficiary', unitTrust.beneficiary ? `${unitTrust.beneficiaryName} (${unitTrust.relationshipWithBeneficiary})` : 'None']] }] : []),
+            ...(isUnitTrust ? accountRequests.filter(r => r.fundName).map((req, idx) => ({ title: accountRequests.filter(r => r.fundName).length > 1 ? `Fund ${idx + 1}` : 'Unit Trust', rows: [['Fund', req.fundName], ['Beneficiary', req.beneficiary ? `${req.beneficiaryName} (${req.relationshipWithBeneficiary})` : 'None']] })) : []),
             ...(isCredit ? [{ title: 'Credit Application', rows: [['Loan Type', credit.loanType], ['Loan Amount', credit.loanAmount ? `K ${Number(credit.loanAmount).toLocaleString()}` : '—']] }] : []),
             { title: 'Documents', rows: [
               [isCompany ? 'NRC (Contact Person)' : 'Copy of ID', files.copyOfId ? files.copyOfId.name : '—'],
@@ -3123,8 +3171,21 @@ function ToolsPage({ onNavigate }) {
           backgroundImage: `repeating-linear-gradient(90deg, transparent, transparent 60px, rgba(255,255,255,0.03) 60px, rgba(255,255,255,0.03) 61px)`,
           pointerEvents: 'none'
         }} />
-        <h1 style={{ fontFamily: font.serif, fontSize: 30, fontWeight: 700, color: C.white, position: 'relative' }}>ROI Calculator</h1>
-        <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.5)', marginTop: 6, position: 'relative' }}>Project your investment growth across our 7 Unit Trust funds</p>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
+          <div>
+            <h1 style={{ fontFamily: font.serif, fontSize: 30, fontWeight: 700, color: C.white, position: 'relative' }}>Estimate Your Earnings</h1>
+            <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.5)', marginTop: 6, position: 'relative' }}>Project your investment growth across our 7 Unit Trust funds</p>
+          </div>
+          <button onClick={() => onNavigate('insights')} style={{
+            display: 'inline-flex', alignItems: 'center', gap: 8, padding: '10px 22px',
+            background: 'rgba(255,255,255,0.15)', color: C.white, fontWeight: 700, fontSize: 13,
+            borderRadius: 8, border: '1px solid rgba(255,255,255,0.3)', cursor: 'pointer',
+            fontFamily: font.sans, backdropFilter: 'blur(4px)', transition: 'all 0.2s', position: 'relative',
+          }}
+            onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.25)'}
+            onMouseLeave={e => e.currentTarget.style.background = 'rgba(255,255,255,0.15)'}
+          ><TrendingUp size={15} /> View Fund Performance</button>
+        </div>
       </div>
       <div style={{ flex: 1, padding: isMobile ? '20px 16px' : '32px 60px', background: C.offWhite }}>
         <ReturnCalculator onNavigate={onNavigate} />
@@ -3253,15 +3314,6 @@ function ServicesPage({ onNavigate, serviceId }) {
                     <p style={{ fontSize: 13, color: C.gray600, lineHeight: 1.6, marginTop: 6 }}>{text}</p>
                   </div>
                 ))}
-              </div>
-              <div style={{ padding: 24, borderRadius: 16, background: 'linear-gradient(135deg, ' + C.navy + ', ' + C.navyDark + ')', color: C.white }}>
-                <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 8 }}>Need Help Choosing?</h3>
-                <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.7)', lineHeight: 1.6, marginBottom: 16 }}>Our advisors can help you find the right service for your goals.</p>
-                <button onClick={() => onNavigate('contact')} style={{
-                  display: 'inline-flex', alignItems: 'center', gap: 6, padding: '10px 20px',
-                  background: C.red, color: C.white, fontWeight: 700, fontSize: 13,
-                  borderRadius: 6, border: 'none', cursor: 'pointer', fontFamily: font.sans,
-                }}>Talk to an Advisor <ArrowRight size={14} /></button>
               </div>
             </div>
           </div>
@@ -3459,27 +3511,42 @@ function InvestingPage({ onNavigate }) {
               <div style={{ background: C.white, borderRadius: 16, padding: isMobile ? 20 : 28, border: '1px solid ' + C.gray100 }}>
                 <h3 style={{ fontFamily: font.serif, fontSize: 20, fontWeight: 700, color: C.gray900, marginBottom: 16 }}>{fundDetail.fund_name}</h3>
 
-                <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 12, marginBottom: 20 }}>
-                  {[
-                    ['Regulator', fundDetail.regulator_short_name],
-                    ['Trustee', fundDetail.trustee],
-                    ['Custodian', fundDetail.custodian],
-                    ['Fund Manager', fundDetail.fund_manager],
-                    ['Min Investment', 'K ' + fundDetail.minimum_investment_amount],
-                    ['Min Period', fundDetail.minimum_investment_period],
-                    ['Risk Profile', fundDetail.risk_profile],
-                    ['Income Policy', fundDetail.income_distribution_policy],
-                    ['Valuation', fundDetail.valuation_frequency],
-                    ['Annual Fee', fundDetail.annual_management_fee + '%'],
-                    ['Initial Fee', fundDetail.initial_fee + '%'],
-                    ['Withdrawal Fee', fundDetail.withdrawal_fee + '%'],
-                    ['Early Withdrawal', fundDetail.early_withdrawal_fee + '%'],
-                  ].map(([label, value]) => (
-                    <div key={label} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid ' + C.gray50 }}>
-                      <span style={{ fontSize: 12, color: C.gray500 }}>{label}</span>
-                      <span style={{ fontSize: 12, fontWeight: 600, color: C.gray800 }}>{value}</span>
-                    </div>
-                  ))}
+                <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1px 1fr', gap: 0, marginBottom: 20 }}>
+                  {(() => {
+                    const items = [
+                      ['Regulator', fundDetail.regulator_short_name],
+                      ['Trustee', fundDetail.trustee],
+                      ['Custodian', fundDetail.custodian],
+                      ['Fund Manager', fundDetail.fund_manager],
+                      ['Min Investment', 'K ' + fundDetail.minimum_investment_amount],
+                      ['Min Period', fundDetail.minimum_investment_period],
+                      ['Risk Profile', fundDetail.risk_profile],
+                      ['Income Policy', fundDetail.income_distribution_policy],
+                      ['Valuation', fundDetail.valuation_frequency],
+                      ['Annual Fee', fundDetail.annual_management_fee + '%'],
+                      ['Initial Fee', fundDetail.initial_fee + '%'],
+                      ['Withdrawal Fee', fundDetail.withdrawal_fee + '%'],
+                      ['Early Withdrawal', fundDetail.early_withdrawal_fee + '%'],
+                    ];
+                    const half = Math.ceil(items.length / 2);
+                    const leftCol = items.slice(0, half);
+                    const rightCol = items.slice(half);
+                    const renderCell = ([label, value]) => (
+                      <div key={label} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 16px', borderBottom: '1px solid ' + C.gray50 }}>
+                        <span style={{ fontSize: 12, color: C.gray500 }}>{label}</span>
+                        <span style={{ fontSize: 12, fontWeight: 600, color: C.gray800 }}>{value}</span>
+                      </div>
+                    );
+                    return isMobile ? (
+                      <>{items.map(renderCell)}</>
+                    ) : (
+                      <>
+                        <div>{leftCol.map(renderCell)}</div>
+                        <div style={{ background: C.gray200, width: 1 }} />
+                        <div>{rightCol.map(renderCell)}</div>
+                      </>
+                    );
+                  })()}
                 </div>
 
                 {fundDetail.asset_types && fundDetail.asset_types.length > 0 && (
@@ -3648,7 +3715,7 @@ export default function App() {
     },
     { label: 'Insights', action: () => navigate('insights') },
     { label: 'Investing With Us', action: () => navigate('investing') },
-    { label: 'ROI Calculator', action: () => navigate('tools') },
+    { label: 'Estimate Your Earnings', action: () => navigate('tools') },
   ];
 
   return (
