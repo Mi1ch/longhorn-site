@@ -1260,7 +1260,7 @@ function FundsTab({ isMobile, onNavigate }) {
           }}
             onMouseEnter={e => e.currentTarget.style.background = C.redHover}
             onMouseLeave={e => e.currentTarget.style.background = C.red}
-          ><Calculator size={14} /> Estimate Your Earnings </button>
+          ><Calculator size={14} /> Estimate Your Earnings</button>
         </div>
 
         {/* Performance Summary — top, full width, darker background */}
@@ -2359,7 +2359,7 @@ function TeamTabContent({ teamTab, setTeamTab, selectedMember, setSelectedMember
         results.forEach(r => {
           if (r.status === 'fulfilled' && r.value && r.value.id != null) {
             const m = r.value;
-            const catKey = m.id <= 5 ? 'board-of-directors' : 'management';
+            const catKey = m.id >= 1 && m.id <= 6 ? 'board-of-directors' : 'management';
             if (!byCategory[catKey]) byCategory[catKey] = [];
             byCategory[catKey].push({
               name: m.full_name,
@@ -2448,7 +2448,7 @@ function AboutPage({ initialTab }) {
         <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', justifyContent: 'space-between', alignItems: isMobile ? 'flex-start' : 'flex-end', gap: isMobile ? 16 : 0 }}>
           <div>
             <h1 style={{ fontFamily: font.serif, fontSize: isMobile ? 22 : 30, fontWeight: 700, color: C.white }}>Longhorn Associates</h1>
-            <p style={{ fontSize: isMobile ? 12 : 14, color: 'rgba(255,255,255,0.5)', marginTop: 6 }}> A Licensed and Regulated Investment and Financial Services Institution.</p>
+            <p style={{ fontSize: isMobile ? 12 : 14, color: 'rgba(255,255,255,0.5)', marginTop: 6 }}>A Licensed and Regulated Investment and Financial Services Institution.</p>
           </div>
           <div style={{ display: 'flex', gap: 4 }}>
             {tabs.map(t => (
@@ -2719,7 +2719,7 @@ function PortalFileField({ label, name, required, hint, file, onFileChange, fiel
   );
 }
 
-function PortalPage() {
+function PortalPage({ onNavigate }) {
   const isMobile = useIsMobile();
 
   return (
@@ -2731,7 +2731,7 @@ function PortalPage() {
         <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)' }}>Investor Onboarding Portal</p>
       </div>
       <div style={{ flex: 1, padding: isMobile ? '20px 16px' : '24px 60px', maxWidth: 720, margin: '0 auto', width: '100%' }}>
-        <PortalRegister isMobile={isMobile} />
+        <PortalRegister isMobile={isMobile} onNavigate={onNavigate} />
       </div>
       <p style={{ textAlign: 'center', fontSize: 10, color: C.gray400, padding: '12px 0' }}>256-bit SSL · Regulated by SEC & PIA Zambia</p>
     </div>
@@ -2740,7 +2740,7 @@ function PortalPage() {
 
 
 
-function PortalRegister({ isMobile }) {
+function PortalRegister({ isMobile, onNavigate }) {
   const S = portalStyles;
   const [step, setStep] = useState(1);
   const [submitting, setSubmitting] = useState(false);
@@ -3212,7 +3212,7 @@ function PortalRegister({ isMobile }) {
           <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginBottom: 8 }}>
             <input type="checkbox" checked={kyc.declaration === 'true'} onChange={e => kycUpdate('declaration', e.target.checked ? 'true' : '')} style={{ marginTop: 3, accentColor: C.red }} />
             <label style={{ fontSize: 12, color: C.gray600, lineHeight: 1.5, cursor: 'pointer' }} onClick={() => kycUpdate('declaration', kyc.declaration === 'true' ? '' : 'true')}>
-              I declare that all information provided is true and accurate to the best of my knowledge. I understand that providing false information may result in my application being rejected. Please review our <span onClick={(e) => { e.stopPropagation(); window.open('#investing', '_blank'); }} style={{ color: C.navy, fontWeight: 700, textDecoration: 'underline', cursor: 'pointer' }}>investment requirements</span> before submitting.
+              I declare that all information provided is true and accurate to the best of my knowledge. I understand that providing false information may result in my application being rejected. Please review our <span onClick={(e) => { e.stopPropagation(); if (onNavigate) onNavigate('investing'); }} style={{ color: C.navy, fontWeight: 700, textDecoration: 'underline', cursor: 'pointer' }}>investment requirements</span> before submitting.
             </label>
           </div>
 
@@ -3997,7 +3997,7 @@ export default function App() {
         {page === 'contact' && <ContactPage />}
         {page === 'tools' && <ToolsPage onNavigate={navigate} />}
         {page === 'investing' && <InvestingPage onNavigate={navigate} />}
-        {page === 'portal' && <PortalPage />}
+        {page === 'portal' && <PortalPage onNavigate={navigate} />}
       </div>
     </div>
   );
