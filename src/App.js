@@ -1260,7 +1260,7 @@ function FundsTab({ isMobile, onNavigate }) {
           }}
             onMouseEnter={e => e.currentTarget.style.background = C.redHover}
             onMouseLeave={e => e.currentTarget.style.background = C.red}
-          ><Calculator size={14} /> Estimate Your Earnings</button>
+          ><Calculator size={14} /> Estimate Your Earnings </button>
         </div>
 
         {/* Performance Summary — top, full width, darker background */}
@@ -1646,7 +1646,7 @@ function FundBenchmarkChart({ fundName, rows, isMobile }) {
 function MarketSnapshotCards({ isMobile }) {
   const [cards, setCards] = useState([]);
   const [loading, setLoading] = useState(true);
-  const scrollRef = useRef(null);
+  const [latestDate, setLatestDate] = useState(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -1659,6 +1659,7 @@ function MarketSnapshotCards({ isMobile }) {
     ]).then(([fxRes, asiRes, mprRes, infRes, grzRes]) => {
       if (cancelled) return;
       const result = [];
+      const dates = [];
 
       /* USD/ZMW from foreign-exchange */
       if (fxRes.status === 'fulfilled') {
@@ -1673,7 +1674,9 @@ function MarketSnapshotCards({ isMobile }) {
             change: `12M ${pct12 >= 0 ? '+' : ''}${pct12.toFixed(2)}%`,
             negative: !zmwUp,
             date: usd.date,
+            category: 'fx',
           });
+          if (usd.date) dates.push(usd.date);
         }
         /* Add other FX pairs (exclude ZMW) */
         fxRows.filter(r => {
@@ -1689,6 +1692,7 @@ function MarketSnapshotCards({ isMobile }) {
             change: `${pct >= 0 ? '+' : ''}${pct.toFixed(2)}%`,
             negative: !zmwGained,
             date: r.date,
+            category: 'fx',
           });
         });
       }
@@ -1698,38 +1702,44 @@ function MarketSnapshotCards({ isMobile }) {
         const d = asiRes.value;
         const dir = (d.direction || '').toLowerCase();
         result.push({
-          label: 'LuSE ASI',
+          label: 'LuSE All Share Index',
           value: d.allShareIndex != null ? Number(d.allShareIndex).toLocaleString('en', { maximumFractionDigits: 2 }) : '—',
           change: d.change != null ? `${Number(d.change) >= 0 ? '+' : ''}${Number(d.change).toFixed(2)}%` : '—',
           negative: dir === 'down',
           date: d.date,
+          category: 'equities',
         });
+        if (d.date) dates.push(d.date);
       }
 
       /* Monetary Policy Rate — macro indicator (no directional arrow) */
       if (mprRes.status === 'fulfilled') {
         const d = mprRes.value;
         result.push({
-          label: 'Monetary Policy Rate',
+          label: 'BoZ Policy Rate',
           value: d.monetaryPolicyRate != null ? `${Number(d.monetaryPolicyRate).toFixed(1)}%` : '—',
           change: d.change || '—',
           negative: false,
           date: d.date,
           isMacro: true,
+          category: 'macro',
         });
+        if (d.date) dates.push(d.date);
       }
 
       /* Inflation Rate — macro indicator (no directional arrow) */
       if (infRes.status === 'fulfilled') {
         const d = infRes.value;
         result.push({
-          label: 'Inflation Rate',
+          label: 'Inflation Rate (CPI)',
           value: d.inflation != null ? `${Number(d.inflation).toFixed(1)}%` : '—',
           change: d.change || '—',
           negative: false,
           date: d.date,
           isMacro: true,
+          category: 'macro',
         });
+        if (d.date) dates.push(d.date);
       }
 
       /* GRZ Securities — one card each */
@@ -1754,11 +1764,17 @@ function MarketSnapshotCards({ isMobile }) {
             change: s.change || '—',
             negative: dir === 'up',
             date: s.date,
+            category: 'grz',
           });
+          if (s.date) dates.push(s.date);
         });
       }
 
       setCards(result);
+      if (dates.length > 0) {
+        const sorted = dates.sort((a, b) => b.localeCompare(a));
+        setLatestDate(sorted[0]);
+      }
       setLoading(false);
     });
 
@@ -1772,12 +1788,18 @@ function MarketSnapshotCards({ isMobile }) {
     return <div style={{ padding: 24, textAlign: 'center', color: C.gray500, fontFamily: INSIGHTS_FONT }}>Unable to load market data.</div>;
   }
 
-  /* Split into 2 rows for desktop display */
-  const half = Math.ceil(cards.length / 2);
-  const row1 = cards.slice(0, half);
-  const row2 = cards.slice(half);
+  const fmtFullDate = (d) => {
+    if (!d) return new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+    return new Date(d + 'T00:00:00').toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+  };
 
-  const CARD_W = isMobile ? 175 : 220;
+  /* Group cards by category */
+  const categories = [
+    { key: 'macro', label: 'Macro Indicators', icon: Activity, desc: 'Bank of Zambia policy benchmarks' },
+    { key: 'fx', label: 'Foreign Exchange', icon: DollarSign, desc: 'ZMW exchange rates' },
+    { key: 'equities', label: 'Equities & Index', icon: TrendingUp, desc: 'Lusaka Securities Exchange' },
+    { key: 'grz', label: 'Government Securities', icon: Shield, desc: 'GRZ Treasury Bills & Bonds' },
+  ];
 
   const renderCard = (c) => {
     const isMacro = c.isMacro;
@@ -1786,10 +1808,13 @@ function MarketSnapshotCards({ isMobile }) {
     const bgTint = isMacro ? 'rgba(26,75,140,0.04)' : (isUp ? 'rgba(22,163,74,0.04)' : 'rgba(220,38,38,0.04)');
     return (
       <div key={c.label} style={{
-        flex: `0 0 ${CARD_W}px`, width: CARD_W, padding: '18px 16px', borderRadius: 14,
-        background: C.white, border: `1px solid ${C.gray100}`, scrollSnapAlign: 'start',
-        position: 'relative', overflow: 'hidden',
-      }}>
+        flex: isMobile ? '0 0 170px' : '1 1 0', minWidth: isMobile ? 170 : 0, padding: '18px 16px', borderRadius: 14,
+        background: C.white, border: `1px solid ${C.gray100}`,
+        position: 'relative', overflow: 'hidden', transition: 'all 0.2s',
+      }}
+        onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 6px 20px rgba(0,0,0,0.08)'; }}
+        onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = 'none'; }}
+      >
         {/* Subtle colored corner accent */}
         <div style={{ position: 'absolute', top: -12, right: -12, width: 56, height: 56, borderRadius: '50%', background: bgTint, pointerEvents: 'none' }} />
 
@@ -1835,46 +1860,63 @@ function MarketSnapshotCards({ isMobile }) {
   };
 
   return (
-    <div style={{ position: 'relative' }}>
-      <style>{`
-        .mkt-hscroll::-webkit-scrollbar { height: 5px; }
-        .mkt-hscroll::-webkit-scrollbar-track { background: ${C.gray50}; border-radius: 3px; }
-        .mkt-hscroll::-webkit-scrollbar-thumb { background: ${C.gray200}; border-radius: 3px; }
-      `}</style>
-
-      {/* Left arrow */}
-      <button onClick={() => { const el = scrollRef.current; if (el) el.scrollBy({ left: -CARD_W * 2, behavior: 'smooth' }); }} style={{
-        position: 'absolute', left: isMobile ? 2 : -16, top: '50%', transform: 'translateY(-50%)',
-        width: 36, height: 36, borderRadius: '50%', background: C.white,
-        boxShadow: '0 2px 10px rgba(0,0,0,0.1)', border: `1px solid ${C.gray100}`,
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        cursor: 'pointer', color: C.gray700, zIndex: 5,
-      }}><ChevronLeft size={18} /></button>
-
-      {/* Right arrow */}
-      <button onClick={() => { const el = scrollRef.current; if (el) el.scrollBy({ left: CARD_W * 2, behavior: 'smooth' }); }} style={{
-        position: 'absolute', right: isMobile ? 2 : -16, top: '50%', transform: 'translateY(-50%)',
-        width: 36, height: 36, borderRadius: '50%', background: C.white,
-        boxShadow: '0 2px 10px rgba(0,0,0,0.1)', border: `1px solid ${C.gray100}`,
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        cursor: 'pointer', color: C.gray700, zIndex: 5,
-      }}><ChevronRight size={18} /></button>
-
-      <div ref={scrollRef} className="mkt-hscroll" style={{
-        overflowX: 'auto', overflowY: 'hidden', scrollSnapType: 'x mandatory',
-        scrollBehavior: 'smooth', WebkitOverflowScrolling: 'touch', paddingBottom: 8,
-      }}>
-        {/* Row 1 */}
-        <div style={{ display: 'flex', gap: 10, marginBottom: 10 }}>
-          {row1.map(renderCard)}
-        </div>
-        {/* Row 2 */}
-        {row2.length > 0 && (
-          <div style={{ display: 'flex', gap: 10 }}>
-            {row2.map(renderCard)}
+    <div>
+      {/* ── Header with Zambia context + date ── */}
+      <div style={{ marginBottom: 24 }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12, marginBottom: 8 }}>
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
+              <div style={{ width: 4, height: 24, borderRadius: 2, background: C.red }} />
+              <h3 style={{ fontFamily: INSIGHTS_FONT, fontSize: isMobile ? 20 : 24, fontWeight: 700, color: C.gray900, letterSpacing: '-0.02em' }}>Zambia Market Snapshot</h3>
+            </div>
+            <p style={{ fontFamily: INSIGHTS_FONT, fontSize: 13, color: C.gray500, marginLeft: 14 }}>
+              Key financial indicators from the Bank of Zambia, LuSE, and GRZ securities markets.
+            </p>
           </div>
-        )}
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: 8, padding: '8px 16px',
+            borderRadius: 10, background: C.white, border: `1px solid ${C.gray100}`,
+          }}>
+            <Calendar size={14} style={{ color: C.navy }} />
+            <span style={{ fontFamily: INSIGHTS_FONT, fontSize: 12, fontWeight: 600, color: C.gray700 }}>{fmtFullDate(latestDate)}</span>
+          </div>
+        </div>
       </div>
+
+      {/* ── Categorised sections ── */}
+      {categories.map(cat => {
+        const catCards = cards.filter(c => c.category === cat.key);
+        if (catCards.length === 0) return null;
+        const CatIcon = cat.icon;
+        return (
+          <div key={cat.key} style={{ marginBottom: 24 }}>
+            {/* Category header */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
+              <div style={{
+                width: 32, height: 32, borderRadius: 8, background: `${C.navy}10`,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+              }}>
+                <CatIcon size={16} style={{ color: C.navy }} />
+              </div>
+              <div>
+                <div style={{ fontFamily: INSIGHTS_FONT, fontSize: 14, fontWeight: 700, color: C.gray900, letterSpacing: '-0.01em' }}>{cat.label}</div>
+                <div style={{ fontFamily: INSIGHTS_FONT, fontSize: 11, color: C.gray400 }}>{cat.desc}</div>
+              </div>
+            </div>
+
+            {/* Cards — flex wrap on desktop, scroll on mobile */}
+            {isMobile ? (
+              <div style={{ display: 'flex', gap: 10, overflowX: 'auto', paddingBottom: 6, WebkitOverflowScrolling: 'touch' }}>
+                {catCards.map(renderCard)}
+              </div>
+            ) : (
+              <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+                {catCards.map(renderCard)}
+              </div>
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -1949,7 +1991,8 @@ function NewsTab({ isMobile }) {
           position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)',
           zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24,
         }}>
-          <div onClick={e => e.stopPropagation()} style={{
+          <style>{`.news-modal-scroll::-webkit-scrollbar { width: 8px; } .news-modal-scroll::-webkit-scrollbar-track { background: ${C.gray100}; border-radius: 0 20px 20px 0; } .news-modal-scroll::-webkit-scrollbar-thumb { background: ${C.gray300}; border-radius: 4px; } .news-modal-scroll::-webkit-scrollbar-thumb:hover { background: ${C.gray400}; }`}</style>
+          <div onClick={e => e.stopPropagation()} className="news-modal-scroll" style={{
             background: '#fff', borderRadius: 20, maxWidth: 640, width: '100%',
             maxHeight: '85vh', overflow: 'auto', boxShadow: '0 24px 64px rgba(0,0,0,0.2)', position: 'relative',
           }}>
@@ -2013,7 +2056,6 @@ function InsightsPage({ onNavigate }) {
       {/* ═══ MARKETS TAB ═══ */}
       {tab === 'markets' && (
         <div style={{ flex: 1, padding: isMobile ? '20px 16px' : '28px 60px', background: C.offWhite, fontFamily: INSIGHTS_FONT }}>
-          <h3 style={{ fontFamily: INSIGHTS_FONT, fontSize: 20, fontWeight: 700, color: C.gray900, marginBottom: 16, letterSpacing: '-0.02em' }}>Market Snapshot</h3>
           <MarketSnapshotCards isMobile={isMobile} />
         </div>
       )}
@@ -2076,34 +2118,39 @@ function TeamModal({ member, accentColor, onClose }) {
       zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: isMobile ? 12 : 24,
     }}>
       <div onClick={e => e.stopPropagation()} style={{
-        background: '#fff', borderRadius: 20, maxWidth: 640, width: '100%',
+        background: '#fff', borderRadius: 20, maxWidth: 480, width: '100%',
         maxHeight: '85vh', overflow: 'auto', position: 'relative', boxShadow: '0 24px 64px rgba(0,0,0,0.2)',
       }}>
         <button onClick={onClose} style={{
           position: 'absolute', top: 16, right: 16, width: 36, height: 36, borderRadius: '50%',
-          background: '#f3f4f6', border: 'none', cursor: 'pointer',
+          background: 'rgba(255,255,255,0.9)', border: 'none', cursor: 'pointer',
           display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10,
+          boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
         }}><X size={18} style={{ color: '#374151' }} /></button>
-        <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row' }}>
-          <div style={{
-            width: isMobile ? '100%' : 220, minHeight: isMobile ? 200 : 280, flexShrink: 0,
-            background: hasPhoto ? 'none' : `linear-gradient(135deg, ${accentColor}, ${accentColor}cc)`,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            borderRadius: isMobile ? '20px 20px 0 0' : '20px 0 0 20px', overflow: 'hidden',
-          }}>
-            {hasPhoto ? (
-              <img src={member.photo} alt={member.name} onError={() => setImgError(true)}
-                style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center top' }} />
-            ) : (
-              <span style={{ fontFamily: font.serif, fontWeight: 700, fontSize: 56, color: '#fff', opacity: 0.9 }}>{member.initials}</span>
-            )}
-          </div>
-          <div style={{ flex: 1, padding: '32px 32px 32px 28px' }}>
-            <h2 style={{ fontFamily: font.serif, fontSize: 22, fontWeight: 700, color: C.gray900, marginBottom: 4 }}>{member.name}</h2>
-            <p style={{ fontSize: 13, color: accentColor, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 20 }}>{member.role}</p>
-            <div style={{ width: 32, height: 3, borderRadius: 2, background: accentColor, marginBottom: 16 }} />
-            <p style={{ fontSize: 14, color: C.gray600, lineHeight: 1.8 }}>{member.bio}</p>
-          </div>
+
+        {/* Photo — top, cropped to portrait */}
+        <div style={{
+          width: '100%', height: 320, overflow: 'hidden',
+          background: hasPhoto ? 'none' : `linear-gradient(135deg, ${accentColor}, ${accentColor}cc)`,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          borderRadius: '20px 20px 0 0', position: 'relative',
+        }}>
+          {hasPhoto ? (
+            <img src={member.photo} alt={member.name} onError={() => setImgError(true)}
+              style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center top' }} />
+          ) : (
+            <span style={{ fontFamily: font.serif, fontWeight: 700, fontSize: 72, color: '#fff', opacity: 0.9 }}>{member.initials}</span>
+          )}
+          {/* Gradient overlay at bottom for smooth transition */}
+          <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 60, background: 'linear-gradient(transparent, rgba(255,255,255,0.8))', pointerEvents: 'none' }} />
+        </div>
+
+        {/* Info — below */}
+        <div style={{ padding: '24px 32px 32px', textAlign: 'center' }}>
+          <h2 style={{ fontFamily: font.serif, fontSize: 22, fontWeight: 700, color: C.gray900, marginBottom: 6 }}>{member.name}</h2>
+          <p style={{ fontSize: 13, color: accentColor, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 16 }}>{member.role}</p>
+          <div style={{ width: 40, height: 3, borderRadius: 2, background: accentColor, margin: '0 auto 20px' }} />
+          <p style={{ fontSize: 14, color: C.gray600, lineHeight: 1.8, textAlign: 'left' }}>{member.bio}</p>
         </div>
       </div>
     </div>
@@ -2400,8 +2447,8 @@ function AboutPage({ initialTab }) {
       <div style={{ background: HEADER_GRADIENT, padding: isMobile ? '24px 20px' : '32px 60px' }}>
         <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', justifyContent: 'space-between', alignItems: isMobile ? 'flex-start' : 'flex-end', gap: isMobile ? 16 : 0 }}>
           <div>
-            <h1 style={{ fontFamily: font.serif, fontSize: isMobile ? 22 : 30, fontWeight: 700, color: C.white }}>About Longhorn Associates</h1>
-            <p style={{ fontSize: isMobile ? 12 : 14, color: 'rgba(255,255,255,0.5)', marginTop: 6 }}>SEC & PIA Licensed Investment Management Company</p>
+            <h1 style={{ fontFamily: font.serif, fontSize: isMobile ? 22 : 30, fontWeight: 700, color: C.white }}>Longhorn Associates</h1>
+            <p style={{ fontSize: isMobile ? 12 : 14, color: 'rgba(255,255,255,0.5)', marginTop: 6 }}> A Licensed and Regulated Investment and Financial Services Institution.</p>
           </div>
           <div style={{ display: 'flex', gap: 4 }}>
             {tabs.map(t => (
@@ -2487,7 +2534,6 @@ function AboutPage({ initialTab }) {
 /* ═══════════════════════════════════════════ */
 const branches = [
   { name: 'Head Office — Lusaka', addr: 'Ground Floor, Gardenview Office Park\nPlot 1146/15, Lagos Road, Rhodespark\nP.O. Box 50655, Ridgeway', ph: '+260 211 25 25 40' },
-  { name: 'Ndola Branch', addr: 'Mwasumina Road, Plot 32\nItawa, Ndola', ph: '+260 956 55 22 38' },
   { name: 'Kitwe Branch', addr: 'Unit E, Second Floor, Building 2\nECL Business Park, Stand 7732\nFreedom Avenue', ph: '+260 950 85 36 41' },
   { name: 'Solwezi Branch', addr: 'Plot No. 133, Independence Ave\nFirst Floor, New Jaids Complex', ph: '+260 95 337 8634' },
 ];
@@ -2495,14 +2541,53 @@ const branches = [
 function ContactPage() {
   const [form, setForm] = useState({ name: '', email: '', phone: '', service: '', message: '' });
   const [sent, setSent] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [contactErr, setContactErr] = useState(null);
+  const [services, setServices] = useState([]);
   const isMobile = useIsMobile();
+
+  /* Fetch service options from API */
+  useEffect(() => {
+    cachedFetch('/api/contact/services/')
+      .then(data => setServices(Array.isArray(data) ? data : []))
+      .catch(() => {});
+  }, []);
+
+  const handleContactSubmit = async () => {
+    setSending(true);
+    setContactErr(null);
+    try {
+      const res = await fetch('/api/contact/messages/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          full_name: form.name,
+          email: form.email,
+          phone: form.phone,
+          service: form.service || null,
+          message: form.message,
+        }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setSent(true);
+        setForm({ name: '', email: '', phone: '', service: '', message: '' });
+      } else {
+        const msgs = Object.entries(data).map(([k, v]) => Array.isArray(v) ? v.join(', ') : v).join('. ');
+        setContactErr(msgs || 'Something went wrong. Please try again.');
+      }
+    } catch (err) {
+      setContactErr('Network error. Please check your connection and try again.');
+    }
+    setSending(false);
+  };
   const iS = { width: '100%', padding: '11px 14px', borderRadius: 8, border: `1.5px solid ${C.gray200}`, fontSize: 14, fontFamily: font.sans, outline: 'none', color: C.gray800, background: C.white };
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', minHeight: 'calc(100vh - 64px)' }}>
       <div style={{ background: HEADER_GRADIENT, padding: isMobile ? '24px 20px' : '32px 60px' }}>
         <h1 style={{ fontFamily: font.serif, fontSize: isMobile ? 22 : 30, fontWeight: 700, color: C.white }}>Contact Us</h1>
-        <p style={{ fontSize: isMobile ? 12 : 14, color: 'rgba(255,255,255,0.5)', marginTop: 6 }}>Visit any of our 4 branches or get in touch online</p>
+        <p style={{ fontSize: isMobile ? 12 : 14, color: 'rgba(255,255,255,0.5)', marginTop: 6 }}>Visit any of our 3 branches or get in touch online</p>
       </div>
 
       <div style={{ flex: 1, display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1.4fr', background: C.white }}>
@@ -2551,12 +2636,17 @@ function ContactPage() {
                 <div><label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: C.gray600, marginBottom: 5 }}>Service</label>
                   <select value={form.service} onChange={e => setForm({ ...form, service: e.target.value })} style={{ ...iS, background: C.white }}>
                     <option value="">Select...</option>
-                    {['Pension Fund Management', 'Unit Trust Fund Management', 'Credit', 'Securities & Stock Broking', 'Consultancy & Advisory', 'Risk Management', 'General Enquiry'].map(s => <option key={s}>{s}</option>)}
+                    {services.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
                   </select>
                 </div>
               </div>
               <div style={{ marginBottom: 20 }}><label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: C.gray600, marginBottom: 5 }}>Message</label><textarea placeholder="Tell us about your goals..." rows={4} value={form.message} onChange={e => setForm({ ...form, message: e.target.value })} style={{ ...iS, resize: 'vertical' }} onFocus={e => e.target.style.borderColor = C.red} onBlur={e => e.target.style.borderColor = C.gray200} /></div>
-              <button onClick={() => setSent(true)} style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '14px 28px', background: C.red, color: C.white, fontWeight: 700, fontSize: 14, borderRadius: 6, border: 'none', cursor: 'pointer', fontFamily: font.sans }}>Send Message <ArrowRight size={14} /></button>
+              {contactErr && (
+                <div style={{ padding: '10px 14px', borderRadius: 8, background: C.redLight, border: `1px solid ${C.red}30`, marginBottom: 16 }}>
+                  <p style={{ fontSize: 12, color: C.red, fontWeight: 600 }}>{contactErr}</p>
+                </div>
+              )}
+              <button disabled={sending} onClick={handleContactSubmit} style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '14px 28px', background: sending ? C.gray400 : C.red, color: C.white, fontWeight: 700, fontSize: 14, borderRadius: 6, border: 'none', cursor: sending ? 'not-allowed' : 'pointer', fontFamily: font.sans, transition: 'all 0.2s' }}>{sending ? 'Sending…' : 'Send Message'} {!sending && <ArrowRight size={14} />}</button>
             </>
           )}
         </div>
@@ -2786,6 +2876,23 @@ function PortalRegister({ isMobile }) {
       } else {
         console.log('=== BACKEND ERRORS ===', JSON.stringify(data, null, 2));
         setErrors(data);
+        /* Build a summary of all validation errors */
+        const errMessages = [];
+        Object.entries(data).forEach(([key, val]) => {
+          if (key === '_general') return;
+          if (typeof val === 'object' && !Array.isArray(val)) {
+            Object.entries(val).forEach(([subKey, subVal]) => {
+              const msgs = Array.isArray(subVal) ? subVal : [subVal];
+              msgs.forEach(m => errMessages.push(m));
+            });
+          } else {
+            const msgs = Array.isArray(val) ? val : [val];
+            msgs.forEach(m => errMessages.push(m));
+          }
+        });
+        if (errMessages.length > 0) {
+          setErrors(prev => ({ ...prev, _validationSummary: errMessages }));
+        }
         if (data.mainKycForm) setStep(2);
         else if (data.unitTrustApplication || data.loanApplication) setStep(3);
       }
@@ -2862,6 +2969,17 @@ function PortalRegister({ isMobile }) {
       {errors._general && (
         <div style={{ padding: '10px 14px', borderRadius: 8, background: `${C.red}10`, border: `1px solid ${C.red}30`, marginBottom: 16 }}>
           <p style={{ fontSize: 12, color: C.red, fontWeight: 600 }}>{errors._general}</p>
+        </div>
+      )}
+      {errors._validationSummary && errors._validationSummary.length > 0 && (
+        <div style={{ padding: '12px 16px', borderRadius: 10, background: C.redLight, border: `1px solid ${C.red}30`, marginBottom: 16 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+            <AlertTriangle size={14} style={{ color: C.red, flexShrink: 0 }} />
+            <span style={{ fontSize: 12, fontWeight: 700, color: C.red }}>Please fix the following:</span>
+          </div>
+          {errors._validationSummary.map((msg, i) => (
+            <div key={i} style={{ fontSize: 12, color: C.red, lineHeight: 1.5, paddingLeft: 22 }}>• {msg}</div>
+          ))}
         </div>
       )}
 
@@ -3094,7 +3212,7 @@ function PortalRegister({ isMobile }) {
           <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginBottom: 8 }}>
             <input type="checkbox" checked={kyc.declaration === 'true'} onChange={e => kycUpdate('declaration', e.target.checked ? 'true' : '')} style={{ marginTop: 3, accentColor: C.red }} />
             <label style={{ fontSize: 12, color: C.gray600, lineHeight: 1.5, cursor: 'pointer' }} onClick={() => kycUpdate('declaration', kyc.declaration === 'true' ? '' : 'true')}>
-              I declare that all information provided is true and accurate to the best of my knowledge. I understand that providing false information may result in my application being rejected.
+              I declare that all information provided is true and accurate to the best of my knowledge. I understand that providing false information may result in my application being rejected. Please review our <span onClick={(e) => { e.stopPropagation(); window.open('#investing', '_blank'); }} style={{ color: C.navy, fontWeight: 700, textDecoration: 'underline', cursor: 'pointer' }}>investment requirements</span> before submitting.
             </label>
           </div>
 
@@ -3178,12 +3296,12 @@ function ToolsPage({ onNavigate }) {
           </div>
           <button onClick={() => onNavigate('insights')} style={{
             display: 'inline-flex', alignItems: 'center', gap: 8, padding: '10px 22px',
-            background: 'rgba(255,255,255,0.15)', color: C.white, fontWeight: 700, fontSize: 13,
-            borderRadius: 8, border: '1px solid rgba(255,255,255,0.3)', cursor: 'pointer',
-            fontFamily: font.sans, backdropFilter: 'blur(4px)', transition: 'all 0.2s', position: 'relative',
+            background: C.navy, color: C.white, fontWeight: 700, fontSize: 13,
+            borderRadius: 8, border: 'none', cursor: 'pointer',
+            fontFamily: font.sans, transition: 'all 0.2s', position: 'relative',
           }}
-            onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.25)'}
-            onMouseLeave={e => e.currentTarget.style.background = 'rgba(255,255,255,0.15)'}
+            onMouseEnter={e => e.currentTarget.style.background = C.navyDark}
+            onMouseLeave={e => e.currentTarget.style.background = C.navy}
           ><TrendingUp size={15} /> View Fund Performance</button>
         </div>
       </div>
@@ -3786,8 +3904,17 @@ export default function App() {
                 )}
               </div>
             ))}
+            <a href="https://longsmart.longhorn-associates.com/web/login" target="_blank" rel="noopener noreferrer" style={{
+              marginLeft: 8, padding: '9px 16px', background: C.navy, color: C.white,
+              fontSize: 12, fontWeight: 700, fontFamily: font.sans, border: 'none',
+              borderRadius: 6, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 6,
+              transition: 'all 0.2s', letterSpacing: '0.02em', textDecoration: 'none',
+            }}
+              onMouseEnter={e => e.currentTarget.style.background = C.navyDark}
+              onMouseLeave={e => e.currentTarget.style.background = C.navy}
+            ><LogIn size={12} /> Login</a>
             <button onClick={() => navigate('portal')} style={{
-              marginLeft: 12, padding: '9px 20px', background: C.red, color: C.white,
+              padding: '9px 16px', background: C.red, color: C.white,
               fontSize: 12, fontWeight: 700, fontFamily: font.sans, border: 'none',
               borderRadius: 6, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 6,
               transition: 'all 0.2s', letterSpacing: '0.02em',
@@ -3842,12 +3969,20 @@ export default function App() {
                 )}
               </div>
             ))}
-            <button onClick={() => navigate('portal')} style={{
-              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-              width: '100%', padding: '14px 0', background: C.red, color: C.white,
-              fontWeight: 700, fontSize: 14, borderRadius: 8, border: 'none', cursor: 'pointer',
-              fontFamily: font.sans, marginTop: 16,
-            }}>Sign Up <ArrowUpRight size={14} /></button>
+            <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
+              <a href="https://longsmart.longhorn-associates.com/web/login" target="_blank" rel="noopener noreferrer" style={{
+                flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                padding: '14px 0', background: C.navy, color: C.white,
+                fontWeight: 700, fontSize: 14, borderRadius: 8, border: 'none', cursor: 'pointer',
+                fontFamily: font.sans, textDecoration: 'none',
+              }}><LogIn size={14} /> Login</a>
+              <button onClick={() => navigate('portal')} style={{
+                flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                padding: '14px 0', background: C.red, color: C.white,
+                fontWeight: 700, fontSize: 14, borderRadius: 8, border: 'none', cursor: 'pointer',
+                fontFamily: font.sans,
+              }}>Sign Up <ArrowUpRight size={14} /></button>
+            </div>
           </div>
         </div>
       )}
